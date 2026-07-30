@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>線上商品資料庫</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div id="loginView" class="center-card">
+    <h1>商品資料庫</h1>
+    <p class="muted">請使用管理員帳號登入</p>
+    <form id="loginForm">
+      <label>電子郵件<input id="loginEmail" type="email" required /></label>
+      <label>密碼<input id="loginPassword" type="password" required /></label>
+      <button type="submit">登入</button>
+      <p id="loginError" class="error"></p>
+    </form>
+  </div>
+
+  <div id="appView" class="hidden">
+    <header>
+      <div>
+        <h1>線上商品資料庫</h1>
+        <span id="userEmail" class="muted"></span>
+      </div>
+      <div class="header-actions">
+        <button id="openParamsBtn" class="secondary">參數設定</button>
+        <button id="logoutBtn" class="secondary">登出</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="toolbar card">
+        <div class="toolbar-row">
+          <input id="searchInput" type="search" placeholder="搜尋編號、標題、規格或備註" />
+          <select id="statusFilter"><option value="all">全部狀態</option><option value="true">上架</option><option value="false">下架</option></select>
+          <button id="columnBtn" class="secondary">顯示欄位</button>
+          <button id="addProductBtn">＋ 新增商品</button>
+        </div>
+        <div class="toolbar-row import-row">
+          <input id="excelFile" type="file" accept=".xlsx,.xls,.csv" />
+          <button id="importBtn">匯入 Excel</button>
+          <select id="importMode"><option value="upsert">相同規格編號：更新</option><option value="skip">相同規格編號：略過</option></select>
+          <span id="importStatus" class="muted"></span>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <article class="card stat"><span>商品筆數</span><strong id="statProducts">0</strong></article>
+        <article class="card stat"><span>上架商品</span><strong id="statActive">0</strong></article>
+        <article class="card stat"><span>平均利潤率</span><strong id="statMargin">0%</strong></article>
+        <article class="card stat"><span>總銷售商品數</span><strong id="statUnits">0</strong></article>
+      </section>
+
+      <section class="card table-card">
+        <div class="table-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
+        <div class="pagination"><button id="prevPage" class="secondary">上一頁</button><span id="pageInfo"></span><button id="nextPage" class="secondary">下一頁</button></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="productDialog">
+    <form id="productForm" method="dialog">
+      <div class="dialog-head"><h2 id="productDialogTitle">新增商品</h2><button type="button" class="icon secondary" data-close="productDialog">×</button></div>
+      <input id="productId" type="hidden" />
+      <div id="productFields" class="form-grid"></div>
+      <div class="dialog-actions"><button type="button" class="secondary" data-close="productDialog">取消</button><button id="saveProductBtn" type="submit">儲存</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="paramsDialog">
+    <form id="paramsForm" method="dialog">
+      <div class="dialog-head"><h2>計算參數</h2><button type="button" class="icon secondary" data-close="paramsDialog">×</button></div>
+      <p class="muted">修改後，沒有人工覆寫的計算欄位會依新參數重新計算。</p>
+      <div id="paramsFields" class="form-grid"></div>
+      <h3>新日誠物流級距</h3>
+      <div class="table-wrap small"><table><thead><tr><th>重量上限(kg)</th><th>運費(JPY)</th></tr></thead><tbody id="shippingTierBody"></tbody></table></div>
+      <div class="dialog-actions"><button type="button" class="secondary" data-close="paramsDialog">取消</button><button type="submit">儲存參數並重算</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="columnsDialog">
+    <form method="dialog">
+      <div class="dialog-head"><h2>選擇顯示欄位</h2><button type="button" class="icon secondary" data-close="columnsDialog">×</button></div>
+      <div id="columnOptions" class="checkbox-grid"></div>
+      <div class="dialog-actions"><button id="selectDefaultColumns" type="button" class="secondary">恢復預設</button><button type="button" data-close="columnsDialog">完成</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
