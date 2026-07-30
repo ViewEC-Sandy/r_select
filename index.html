@@ -26,7 +26,7 @@
         <span id="userEmail" class="muted"></span>
       </div>
       <div class="header-actions">
-        <button id="maintenanceBtn" class="secondary">系統維護</button><button id="openParamsBtn" class="secondary">參數設定</button>
+        <button id="storeManagerBtn" class="secondary">店鋪管理</button><button id="maintenanceBtn" class="secondary">系統維護</button><button id="openParamsBtn" class="secondary">參數設定</button>
         <button id="logoutBtn" class="secondary">登出</button>
       </div>
     </header>
@@ -90,13 +90,42 @@
   </dialog>
 
 
+  <dialog id="storesDialog">
+    <form method="dialog">
+      <div class="dialog-head"><h2>店鋪管理</h2><button type="button" class="icon secondary" data-close="storesDialog">×</button></div>
+      <p class="muted">匯入含「樂天編號、店家名／店鋪名、網址、運費」的 Excel。沒有個別運費時使用參數設定中的預設運費。</p>
+      <div class="toolbar-row import-row store-tools">
+        <input id="storeExcelFile" type="file" accept=".xlsx,.xls" />
+        <button id="storeImportBtn" type="button">匯入店鋪總表</button>
+        <button id="resyncStoresBtn" type="button" class="secondary">重新套用店鋪資料</button>
+        <span id="storeImportStatus" class="muted"></span>
+      </div>
+      <div class="toolbar-row store-tools"><input id="storeSearch" type="search" placeholder="搜尋店鋪編號、名稱或網址"><button id="addStoreBtn" type="button">＋ 新增店鋪</button><span id="storeCount" class="muted"></span></div>
+      <div class="table-wrap small"><table><thead><tr><th>店鋪編號</th><th>店鋪名</th><th>店鋪網址</th><th>運費(JPY)</th><th>操作</th></tr></thead><tbody id="storeTableBody"></tbody></table></div>
+    </form>
+  </dialog>
+
+  <dialog id="storeEditDialog">
+    <form id="storeForm" method="dialog">
+      <div class="dialog-head"><h2 id="storeFormTitle">新增店鋪</h2><button type="button" class="icon secondary" data-close="storeEditDialog">×</button></div>
+      <input id="storeId" type="hidden">
+      <div class="form-grid">
+        <label>店鋪編號<input id="storeCode" name="code" required placeholder="例如 R60"></label>
+        <label>店鋪名<input id="storeName" name="name"></label>
+        <label>日本國內運費(JPY)<input id="storeShipping" name="shippingJPY" type="number" min="0" step="1" required></label>
+        <label class="full-span">店鋪網址<input id="storeUrl" name="url" type="url" placeholder="https://..."></label>
+      </div>
+      <div class="dialog-actions"><button type="button" class="secondary" data-close="storeEditDialog">取消</button><button type="submit">儲存店鋪</button></div>
+    </form>
+  </dialog>
+
   <dialog id="maintenanceDialog">
     <form method="dialog">
       <div class="dialog-head"><h2>系統維護</h2><button type="button" class="icon secondary" data-close="maintenanceDialog">×</button></div>
       <p class="muted">刪除作業不會刪除 Firebase Authentication 登入帳號。若 Firestore 中另有 users 或 roles 集合，也不會被「清空全部匯入資料」移除。</p>
       <div id="maintenanceCounts" class="maintenance-list"></div>
       <section class="health-box"><h3>商品對應健康檢查</h3><div class="health-grid"><span>銷售未對應<strong id="healthSales">0</strong></span><span>廣告未對應<strong id="healthAds">0</strong></span><span>商品分析未對應<strong id="healthAnalysis">0</strong></span></div></section>
-      <div class="maintenance-actions"><button id="rebuildIndexBtn" type="button" class="secondary">重建商品索引</button><button id="recalcDashboardBtn" type="button" class="secondary">Dashboard 重新計算</button><button id="healthCheckBtn" type="button" class="secondary">執行健康檢查</button></div>
+      <div class="maintenance-actions"><button id="resyncMaintenanceBtn" type="button" class="secondary">重新套用店鋪與運費</button><button id="rebuildIndexBtn" type="button" class="secondary">重建商品索引</button><button id="recalcDashboardBtn" type="button" class="secondary">Dashboard 重新計算</button><button id="healthCheckBtn" type="button" class="secondary">執行健康檢查</button></div>
       <section class="danger-zone"><h3>刪除資料</h3><label>請輸入 <strong>DELETE</strong><input id="deleteConfirm" autocomplete="off" placeholder="DELETE"></label><div class="dialog-actions"><button id="deleteSelectedBtn" type="button" class="danger">刪除勾選資料</button><button id="clearAllBtn" type="button" class="danger">一鍵清空全部匯入資料</button></div></section>
     </form>
   </dialog>
