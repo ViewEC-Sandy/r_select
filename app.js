@@ -63,9 +63,177 @@ function renderColumns(){ $('columnOptions').innerHTML=FIELDS.map(([k,l])=>`<lab
 function renderProductForm(p={}){const computed=compute(p);$('productId').value=p.id||'';$('productDialogTitle').textContent=p.id?'編輯商品':'新增商品';const pd=p.platformData||{};const platformHtml=`<div class="platform-editor full-span"><h3>平台資料</h3>${PLATFORMS.map(x=>`<fieldset><legend>${x.name}</legend><label><input type="checkbox" name="platform_${x.id}_enabled" ${pd[x.id]?.enabled?'checked':''}> 啟用此平台</label><label>售價<input type="number" step="any" name="platform_${x.id}_price" value="${esc(pd[x.id]?.price??'')}"></label><label>上架<select name="platform_${x.id}_active"><option value="true" ${pd[x.id]?.active!==false?'selected':''}>上架</option><option value="false" ${pd[x.id]?.active===false?'selected':''}>下架</option></select></label><label>備註<textarea name="platform_${x.id}_note">${esc(pd[x.id]?.note??'')}</textarea></label></fieldset>`).join('')}</div>`;$('productFields').innerHTML=platformHtml+FIELDS.filter(([k])=>!['conversionRate'].includes(k)).map(([k,l,t,mode])=>{const v=computed[k]??'';if(k==='active')return `<label>${l}<select name="${k}"><option value="true" ${v!==false?'selected':''}>上架</option><option value="false" ${v===false?'selected':''}>下架</option></select></label>`;if(t==='textarea')return `<label>${l}<textarea name="${k}">${esc(v)}</textarea></label>`;const readonly=mode==='calculated'&&k==='logisticsMethod';const inputType=t==='number'||t==='percent'?'number':'text';const step=t==='percent'?'0.0001':'any';const input=`<input name="${k}" type="${inputType}" step="${step}" value="${esc(v)}" ${readonly?'readonly':''}>`;if(mode==='calculated'&&!readonly)return `<label>${l}<span class="override-row">${input}<button type="button" class="secondary reset-override" data-reset="${k}">自動</button></span></label>`;return `<label>${l}${input}</label>`}).join('')}
 function renderParams(){$('paramsFields').innerHTML=PARAM_DEFS.map(([k,l])=>`<label>${l}<input name="${k}" type="number" step="any" value="${params[k]}"></label>`).join('');$('shippingTierBody').innerHTML=params.tiers.map((t,i)=>`<tr><td><input name="tierMax_${i}" type="number" step="any" value="${t[0]}"></td><td><input name="tierFee_${i}" type="number" step="any" value="${t[1]}"></td></tr>`).join('')}
 async function saveProduct(form){const fd=new FormData(form), id=$('productId').value;const old=id?products.find(p=>p.id===id):{};const data={...old,overrides:{...(old?.overrides||{})}};FIELDS.forEach(([k,,t,mode])=>{if(k==='conversionRate')return;const raw=fd.get(k);if(raw===null)return;data[k]=t==='number'||t==='percent'?(raw===''?null:Number(raw)):t==='boolean'?raw==='true':String(raw);if(mode==='calculated'&&k!=='logisticsMethod'&&raw!=='')data.overrides[k]=true});data.platformData={};PLATFORMS.forEach(x=>{data.platformData[x.id]={enabled:fd.get(`platform_${x.id}_enabled`)==='on',price:fd.get(`platform_${x.id}_price`)===''?null:Number(fd.get(`platform_${x.id}_price`)),active:fd.get(`platform_${x.id}_active`)==='true',note:String(fd.get(`platform_${x.id}_note`)||'')}});data.title=String(data.title||'').slice(0,15);data.updatedAt=serverTimestamp();if(!id)data.createdAt=serverTimestamp();const ref=id?doc(db,'products',id):doc(collection(db,'products'));await setDoc(ref,data,{merge:true});toast('商品已儲存');$('productDialog').close();await loadAll()}
-function findHeader(row, aliases){const normalized=Object.fromEntries(Object.keys(row).map(k=>[String(k).trim(),k]));for(const a of aliases){if(normalized[a]!==undefined)return normalized[a]}return null}
+function cleanText(value){
+  if(value===null||value===undefined)return '';
+  return String(value)
+    .replace(/\uFEFF/g,'')
+    .replace(/\u00A0/g,' ')
+    .replace(/\u3000/g,' ')
+    .replace(/[\r\n\t]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function normalizeHeader(value){
+  return cleanText(value)
+    .replace(/[\s\u00A0\u3000]+/g,'')
+    .replace(/[：:]+$/g,'');
+}
+function normalizeId(value){
+  return cleanText(value).replace(/[\r\n\t]/g,'');
+}
+function parseImportNumber(value){
+  const cleaned=cleanText(value).replace(/,/g,'').replace(/[￥¥元]/g,'');
+  if(cleaned==='')return null;
+  const parsed=Number(cleaned);
+  return Number.isFinite(parsed)?parsed:null;
+}
+function normalizeImportRow(row){
+  const normalized={};
+  Object.entries(row||{}).forEach(([key,value])=>{
+    normalized[normalizeHeader(key)]=value;
+  });
+  return normalized;
+}
+function findHeader(row, aliases){
+  const normalizedKeys=Object.keys(row||{});
+  for(const alias of aliases){
+    const target=normalizeHeader(alias);
+    const found=normalizedKeys.find(key=>normalizeHeader(key)===target);
+    if(found!==undefined)return found;
+  }
+  return null;
+}
 async function exportProducts(){const rows=products.map(p=>{const r={};FIELDS.forEach(([k,l])=>r[l]=p[k]??'');PLATFORMS.forEach(x=>{const d=p.platformData?.[x.id]||{};r[`${x.name}-啟用`]=!!d.enabled;r[`${x.name}-售價`]=d.price??'';r[`${x.name}-上架`]=d.active!==false;r[`${x.name}-備註`]=d.note??''});return r});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'商品主檔');XLSX.writeFile(wb,`商品資料庫_${new Date().toISOString().slice(0,10)}.xlsx`)}
-async function importExcel(){const file=$('excelFile').files[0];if(!file)return toast('請先選擇 Excel 檔案');$('importBtn').disabled=true;$('importStatus').textContent='讀取中…';try{const buf=await file.arrayBuffer(), wb=XLSX.read(buf,{type:'array'});const preferred=wb.SheetNames.find(n=>n.toLowerCase()==='model')||wb.SheetNames[0];const rows=XLSX.utils.sheet_to_json(wb.Sheets[preferred],{defval:''});if(!rows.length)throw new Error('工作表沒有資料');const existing=new Map(products.filter(p=>p.specManagementId).map(p=>[String(p.specManagementId),p]));let done=0,skipped=0;for(let start=0;start<rows.length;start+=400){const batch=writeBatch(db);for(const row of rows.slice(start,start+400)){const selectedPlatform=$('importPlatform').value;const data={active:true,overrides:{},platformData:{[selectedPlatform]:{enabled:true,active:true,price:null,note:''}}};for(const [key,aliases] of Object.entries(IMPORT_ALIASES)){const h=findHeader(row,aliases);if(h!==null)data[key]=row[h]}data.title=String(data.title||'').slice(0,15);data.priceJPY=data.priceJPY===''?null:n(data.priceJPY);data.weightG=data.weightG===''?null:n(data.weightG);data.pageViews=n(data.pageViews);data.unitsSold=n(data.unitsSold);data.orderCount=n(data.orderCount);const key=String(data.specManagementId||'').trim();if(!key){skipped++;continue}const old=existing.get(key);if(old&&$('importMode').value==='skip'){skipped++;continue}const ref=old?doc(db,'products',old.id):doc(collection(db,'products'));const merged=old?{...data,active:old.active??true,note:data.note||old.note||'',overrides:old.overrides||{},updatedAt:serverTimestamp()}:{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};batch.set(ref,merged,{merge:true});done++}await batch.commit()}await addDoc(collection(db,'imports'),{fileName:file.name,rowCount:rows.length,successCount:done,skippedCount:skipped,createdAt:serverTimestamp()});$('importStatus').textContent=`完成：${done} 筆，略過 ${skipped} 筆`;toast('Excel 匯入完成');await loadAll()}catch(e){console.error(e);$('importStatus').textContent='匯入失敗：'+e.message}finally{$('importBtn').disabled=false}}
+async function importExcel(){
+  const file=$('excelFile').files[0];
+  if(!file)return toast('請先選擇 Excel 檔案');
+  $('importBtn').disabled=true;
+  $('importStatus').textContent='讀取中…';
+
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const preferred=wb.SheetNames.find(name=>normalizeHeader(name).toLowerCase()==='model')||wb.SheetNames[0];
+    const rawRows=XLSX.utils.sheet_to_json(wb.Sheets[preferred],{
+      defval:'',
+      raw:false,
+      blankrows:false
+    });
+
+    if(!rawRows.length)throw new Error('工作表沒有資料');
+
+    const rows=rawRows.map(normalizeImportRow);
+    const existing=new Map(
+      products
+        .filter(p=>normalizeId(p.specManagementId))
+        .map(p=>[normalizeId(p.specManagementId),p])
+    );
+
+    let currentProductManagementId='';
+    let currentTitle='';
+    let currentNote='';
+    let done=0;
+    let skipped=0;
+
+    for(let start=0;start<rows.length;start+=400){
+      const batch=writeBatch(db);
+
+      for(const row of rows.slice(start,start+400)){
+        const selectedPlatform=$('importPlatform').value;
+        const data={
+          active:true,
+          overrides:{},
+          platformData:{
+            [selectedPlatform]:{
+              enabled:true,
+              active:true,
+              price:null,
+              note:''
+            }
+          }
+        };
+
+        for(const [key,aliases] of Object.entries(IMPORT_ALIASES)){
+          const header=findHeader(row,aliases);
+          if(header!==null)data[key]=row[header];
+        }
+
+        const productManagementId=normalizeId(data.productManagementId);
+        const specManagementId=normalizeId(data.specManagementId);
+        const title=cleanText(data.title);
+        const note=cleanText(data.note);
+
+        if(productManagementId)currentProductManagementId=productManagementId;
+        if(title)currentTitle=title;
+        if(note)currentNote=note;
+
+        data.productManagementId=productManagementId||currentProductManagementId;
+        data.specManagementId=specManagementId;
+        data.title=(title||currentTitle).slice(0,15);
+        data.note=note||currentNote;
+
+        data.spec1=cleanText(data.spec1);
+        data.spec2=cleanText(data.spec2);
+        data.spec3=cleanText(data.spec3);
+
+        data.priceJPY=parseImportNumber(data.priceJPY);
+        data.weightG=parseImportNumber(data.weightG);
+        data.pageViews=parseImportNumber(data.pageViews)??0;
+        data.unitsSold=parseImportNumber(data.unitsSold)??0;
+        data.orderCount=parseImportNumber(data.orderCount)??0;
+
+        if(!data.specManagementId){
+          skipped++;
+          continue;
+        }
+
+        const old=existing.get(data.specManagementId);
+        if(old&&$('importMode').value==='skip'){
+          skipped++;
+          continue;
+        }
+
+        const ref=old?doc(db,'products',old.id):doc(collection(db,'products'));
+        const merged=old
+          ?{
+              ...data,
+              active:old.active??true,
+              note:data.note||old.note||'',
+              overrides:old.overrides||{},
+              updatedAt:serverTimestamp()
+            }
+          :{
+              ...data,
+              createdAt:serverTimestamp(),
+              updatedAt:serverTimestamp()
+            };
+
+        batch.set(ref,merged,{merge:true});
+        existing.set(data.specManagementId,{id:ref.id,...merged});
+        done++;
+      }
+
+      await batch.commit();
+    }
+
+    await addDoc(collection(db,'imports'),{
+      fileName:file.name,
+      rowCount:rows.length,
+      successCount:done,
+      skippedCount:skipped,
+      createdAt:serverTimestamp()
+    });
+
+    $('importStatus').textContent=`完成：${done} 筆，略過 ${skipped} 筆`;
+    toast('Excel 匯入完成');
+    await loadAll();
+  }catch(e){
+    console.error(e);
+    $('importStatus').textContent='匯入失敗：'+e.message;
+  }finally{
+    $('importBtn').disabled=false;
+  }
+}
 
 
 async function countCollection(name){const s=await getDocs(collection(db,name));return s.size}
