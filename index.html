@@ -23,13 +23,15 @@
   <div id="appView" class="hidden enterprise-layout">
     <aside class="sidebar">
       <div class="brand-block">
-        <h2>R-select<br>Dashboard</h2>
-        <small>Product Database V1.2.1</small>
+        <h2>R-Select<br>Dashboard</h2>
+        <small>Product Database V1.2.2</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
         <button id="productTabBtn" type="button" class="side-nav-item active">商品資料庫</button>
         <button id="salesTabBtn" type="button" class="side-nav-item">銷售狀態</button>
+        <button id="crossPlatformTabBtn" type="button" class="side-nav-item">商品跨平台</button>
+        <button id="platformCompareTabBtn" type="button" class="side-nav-item">平台比較</button>
         <div class="nav-separator"></div>
         <button id="storeManagerBtn" type="button" class="side-nav-item">店鋪管理</button>
         <button id="openParamsBtn" type="button" class="side-nav-item">參數設定</button>
@@ -72,7 +74,7 @@
           <input id="excelFile" type="file" accept=".xlsx,.xls,.csv" />
           <button id="importBtn">匯入 Excel</button><select id="importPlatform"><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select>
           <select id="importMode"><option value="upsert">相同規格編號：更新</option><option value="skip">相同規格編號：略過</option></select>
-          <span id="importStatus" class="muted"></span>
+          <label class="sales-period">報表開始<input id="salesImportStart" type="date"></label><label class="sales-period">報表結束<input id="salesImportEnd" type="date"></label><span id="importStatus" class="muted"></span>
         </div>
       </section>
 
@@ -106,13 +108,16 @@
         </section>
         <section class="overview-grid">
           <article class="card chart-card"><h3>銷售趨勢</h3><canvas id="salesTrendChart"></canvas></article>
-          <article class="card chart-card"><h3>銷售數量 Top 10</h3><canvas id="rankingChart"></canvas></article>
+          <article class="card chart-card chart-card-wide"><h3>銷售數量 Top 10</h3><canvas id="rankingChart"></canvas></article>
         </section>
+        <section class="overview-grid extra-charts"><article class="card chart-card"><h3>流量趨勢</h3><canvas id="trafficTrendChart"></canvas></article><article class="card chart-card"><h3>平台營收占比</h3><canvas id="platformRevenueChart"></canvas></article></section>
         <section class="card ranking-card">
-          <div class="section-head"><h3>商品銷售排行榜</h3><span id="rankingPeriod" class="muted"></span></div>
+          <div class="section-head"><h3>商品銷售排行榜</h3><div><select id="rankingSort"><option value="units_desc">銷售數量：大到小</option><option value="units_asc">銷售數量：小到大</option><option value="revenue_desc">營業額：大到小</option><option value="revenue_asc">營業額：小到大</option><option value="orders_desc">訂單數：大到小</option><option value="price_desc">單價：大到小</option></select> <span id="rankingPeriod" class="muted"></span></div></div>
           <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
         </section>
       </section>
+      <section id="crossPlatformView" class="hidden overview-page"><section class="card"><h2>商品跨平台</h2><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead><tr><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>平台</th><th>營業額</th><th>銷量</th><th>訂單數</th></tr></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>
+      <section id="platformCompareView" class="hidden overview-page"><section class="card"><h2>平台比較</h2><div class="table-wrap"><table><thead><tr><th>平台</th><th>營業額</th><th>銷量</th><th>訂單數</th><th>頁面檢視</th><th>轉換率</th></tr></thead><tbody id="platformCompareBody"></tbody></table></div></section></section>
       </main>
     </div>
   </div>
