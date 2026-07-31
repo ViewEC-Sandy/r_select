@@ -20,31 +20,48 @@
     </form>
   </div>
 
-  <div id="appView" class="hidden">
-    <header>
-      <div>
-        <h1>線上商品資料庫</h1>
-        <span id="userEmail" class="muted"></span>
+  <div id="appView" class="hidden enterprise-layout">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <h2>Japan EC<br>Dashboard</h2>
+        <small>Product Database V1.2.1</small>
       </div>
-      <div class="header-actions">
-        <button id="storeManagerBtn" class="secondary">店鋪管理</button><button id="maintenanceBtn" class="secondary">系統維護</button><button id="openParamsBtn" class="secondary">參數設定</button>
-        <button id="logoutBtn" class="secondary">登出</button>
-      </div>
-    </header>
-
-    <main>
-      <nav class="view-tabs card" aria-label="資料分頁">
-        <button id="productTabBtn" type="button" class="view-tab active">商品資料庫</button>
-        <button id="salesTabBtn" type="button" class="view-tab">銷售狀態</button>
-        <button id="overviewTabBtn" type="button" class="view-tab">營運總覽</button>
+      <nav class="side-nav" aria-label="主要功能">
+        <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
+        <button id="productTabBtn" type="button" class="side-nav-item active">商品資料庫</button>
+        <button id="salesTabBtn" type="button" class="side-nav-item">銷售狀態</button>
+        <div class="nav-separator"></div>
+        <button id="storeManagerBtn" type="button" class="side-nav-item">店鋪管理</button>
+        <button id="openParamsBtn" type="button" class="side-nav-item">參數設定</button>
+        <button id="maintenanceBtn" type="button" class="side-nav-item">系統維護</button>
       </nav>
-      <div id="databaseView">
+      <div class="sidebar-user">
+        <span id="userEmail"></span>
+        <button id="logoutBtn" class="sidebar-logout">登出</button>
+      </div>
+    </aside>
+
+    <div class="enterprise-shell">
+      <header class="enterprise-header">
+        <div>
+          <small>TAIWAN PAVILION / MULTI-PLATFORM</small>
+          <h1 id="pageTitle">商品資料庫</h1>
+        </div>
+        <div class="header-actions">
+          <button id="exportBtn" class="secondary">匯出本頁 Excel</button>
+          <button id="columnBtn" class="secondary">顯示欄位</button>
+          <button id="clearColumnFiltersBtn" class="secondary">清除篩選</button>
+        </div>
+      </header>
+
+      <main class="enterprise-main">
+        <div id="databaseView">
       <section class="toolbar card">
         <div class="toolbar-row">
           <input id="searchInput" type="search" placeholder="搜尋編號、標題、規格或備註" />
           <select id="statusFilter"><option value="all">全部狀態</option><option value="true">上架</option><option value="false">下架</option></select>
-          <button id="columnBtn" class="secondary">顯示欄位</button>
-          <button id="clearColumnFiltersBtn" class="secondary">清除排序／篩選</button>
+
+
           <button id="selectFilteredBtn" class="secondary">選取全部篩選結果</button>
           <button id="clearSelectionBtn" class="secondary">清除選取</button>
           <button id="discountCalcBtn">折扣利潤試算</button>
@@ -53,7 +70,7 @@
         </div>
         <div class="toolbar-row import-row">
           <input id="excelFile" type="file" accept=".xlsx,.xls,.csv" />
-          <button id="importBtn">匯入 Excel</button><button id="exportBtn" class="secondary">匯出 Excel</button><select id="importPlatform"><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select>
+          <button id="importBtn">匯入 Excel</button><select id="importPlatform"><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select>
           <select id="importMode"><option value="upsert">相同規格編號：更新</option><option value="skip">相同規格編號：略過</option></select>
           <span id="importStatus" class="muted"></span>
         </div>
@@ -72,7 +89,7 @@
       </section>
       </div>
 
-      <section id="overviewView" class="hidden overview-page">
+        <section id="overviewView" class="hidden overview-page">
         <section class="card overview-toolbar">
           <label>開始日期<input id="overviewStart" type="date"></label>
           <label>結束日期<input id="overviewEnd" type="date"></label>
@@ -96,7 +113,8 @@
           <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
         </section>
       </section>
-    </main>
+      </main>
+    </div>
   </div>
 
   <dialog id="discountDialog">
