@@ -32,12 +32,20 @@
     </header>
 
     <main>
+      <nav class="view-tabs card" aria-label="資料分頁">
+        <button id="productTabBtn" type="button" class="view-tab active">商品資料庫</button>
+        <button id="salesTabBtn" type="button" class="view-tab">銷售狀態</button>
+      </nav>
       <section class="toolbar card">
         <div class="toolbar-row">
           <input id="searchInput" type="search" placeholder="搜尋編號、標題、規格或備註" />
           <select id="statusFilter"><option value="all">全部狀態</option><option value="true">上架</option><option value="false">下架</option></select>
           <button id="columnBtn" class="secondary">顯示欄位</button>
           <button id="clearColumnFiltersBtn" class="secondary">清除排序／篩選</button>
+          <button id="selectFilteredBtn" class="secondary">選取全部篩選結果</button>
+          <button id="clearSelectionBtn" class="secondary">清除選取</button>
+          <button id="discountCalcBtn">折扣利潤試算</button>
+          <span id="selectionCount" class="selection-count">已選 0 筆</span>
           <button id="addProductBtn">＋ 新增商品</button>
         </div>
         <div class="toolbar-row import-row">
@@ -61,6 +69,21 @@
       </section>
     </main>
   </div>
+
+  <dialog id="discountDialog">
+    <form method="dialog">
+      <div class="dialog-head"><h2>折扣後利潤試算</h2><button type="button" class="icon secondary" data-close="discountDialog">×</button></div>
+      <div class="discount-controls">
+        <label>折扣百分比（例如 20 代表 8 折）<input id="discountPercent" type="number" min="0" max="100" step="0.1" value="10"></label>
+        <button id="recalcDiscountBtn" type="button">重新計算</button>
+        <button id="exportDiscountBtn" type="button" class="secondary">匯出試算結果</button>
+      </div>
+      <div id="discountSummary" class="discount-summary"></div>
+      <div class="table-wrap discount-table-wrap"><table><thead><tr><th>商品規格管理編號</th><th>商品標題</th><th>原售價(TWD)</th><th>折扣後售價(TWD)</th><th>折扣後利潤(TWD)</th><th>折扣後利潤率</th></tr></thead><tbody id="discountTableBody"></tbody></table></div>
+      <p class="muted">本功能為試算，不會修改商品資料。折扣後售價會重新判斷台幣免運門檻、客收運費及平台費。</p>
+      <div class="dialog-actions"><button type="button" data-close="discountDialog">完成</button></div>
+    </form>
+  </dialog>
 
   <dialog id="productDialog">
     <form id="productForm" method="dialog">
