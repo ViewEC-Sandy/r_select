@@ -6,6 +6,7 @@
   <title>線上商品資料庫</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div id="loginView" class="center-card">
@@ -35,7 +36,9 @@
       <nav class="view-tabs card" aria-label="資料分頁">
         <button id="productTabBtn" type="button" class="view-tab active">商品資料庫</button>
         <button id="salesTabBtn" type="button" class="view-tab">銷售狀態</button>
+        <button id="overviewTabBtn" type="button" class="view-tab">營運總覽</button>
       </nav>
+      <div id="databaseView">
       <section class="toolbar card">
         <div class="toolbar-row">
           <input id="searchInput" type="search" placeholder="搜尋編號、標題、規格或備註" />
@@ -66,6 +69,32 @@
       <section class="card table-card">
         <div class="table-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
         <div class="pagination"><button id="prevPage" class="secondary">上一頁</button><span id="pageInfo"></span><button id="nextPage" class="secondary">下一頁</button></div>
+      </section>
+      </div>
+
+      <section id="overviewView" class="hidden overview-page">
+        <section class="card overview-toolbar">
+          <label>開始日期<input id="overviewStart" type="date"></label>
+          <label>結束日期<input id="overviewEnd" type="date"></label>
+          <label>平台<select id="overviewPlatform"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select></label>
+          <button id="applyOverviewBtn" type="button">套用</button>
+          <button id="resetOverviewBtn" type="button" class="secondary">全部期間</button>
+        </section>
+        <section class="overview-kpis">
+          <article class="card stat"><span>頁面檢視總數</span><strong id="ovPageViews">0</strong></article>
+          <article class="card stat"><span>銷售商品數</span><strong id="ovUnitsSold">0</strong></article>
+          <article class="card stat"><span>銷售訂單數</span><strong id="ovOrders">0</strong></article>
+          <article class="card stat"><span>整體轉換率</span><strong id="ovConversion">0%</strong></article>
+          <article class="card stat"><span>推估營業額(TWD)</span><strong id="ovRevenue">0</strong></article>
+        </section>
+        <section class="overview-grid">
+          <article class="card chart-card"><h3>銷售趨勢</h3><canvas id="salesTrendChart"></canvas></article>
+          <article class="card chart-card"><h3>銷售數量 Top 10</h3><canvas id="rankingChart"></canvas></article>
+        </section>
+        <section class="card ranking-card">
+          <div class="section-head"><h3>商品銷售排行榜</h3><span id="rankingPeriod" class="muted"></span></div>
+          <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
+        </section>
       </section>
     </main>
   </div>
