@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.4</small>
+        <small>Product Database V1.2.5</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -97,7 +97,7 @@
         <section class="card overview-toolbar">
           <label>開始日期<input id="overviewStart" type="date"></label>
           <label>結束日期<input id="overviewEnd" type="date"></label>
-          <label>平台<select id="overviewPlatform"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select></label>
+          <label>平台<select id="overviewPlatform"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label>
           <button id="applyOverviewBtn" type="button">套用</button>
           <button id="resetOverviewBtn" type="button" class="secondary">全部期間</button>
         </section>
@@ -119,15 +119,48 @@
           <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
         </section>
       </section>
-      <section id="crossPlatformView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>商品跨平台</h2><div class="period-filter"><label>開始日期<input id="crossStart" type="date"></label><label>結束日期<input id="crossEnd" type="date"></label><label>平台<select id="crossPlatformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select></label></div></div><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>已收運費</span><strong id="crossShipping">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead id="crossPlatformHead"></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>
-      <section id="platformCompareView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>平台比較</h2><div class="period-filter"><label>開始日期<input id="platformStart" type="date"></label><label>結束日期<input id="platformEnd" type="date"></label><label>平台<select id="platformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select></label></div></div><div class="table-wrap"><table><thead id="platformCompareHead"></thead><tbody id="platformCompareBody"></tbody></table></div></section></section>
+      <section id="crossPlatformView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>商品跨平台</h2><div class="period-filter"><label>開始日期<input id="crossStart" type="date"></label><label>結束日期<input id="crossEnd" type="date"></label><label>平台<select id="crossPlatformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>已收運費</span><strong id="crossShipping">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead id="crossPlatformHead"></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>
+      <section id="platformCompareView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>平台比較</h2><div class="period-filter"><label>開始日期<input id="platformStart" type="date"></label><label>結束日期<input id="platformEnd" type="date"></label><label>平台<select id="platformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div class="table-wrap"><table><thead id="platformCompareHead"></thead><tbody id="platformCompareBody"></tbody></table></div></section></section>
 
       <section id="importView" class="hidden overview-page import-page">
-        <section class="card overview-toolbar"><label>平台<select id="importPlatform"><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select></label><label>開始日期<input id="salesImportStart" type="date"></label><label>結束日期<input id="salesImportEnd" type="date"></label></section>
+        <section class="card overview-toolbar">
+          <label>平台
+            <select id="importPlatform">
+              <option value="taiwan_rakuten">台灣樂天</option>
+              <option value="rianyou_shopify">日安優物 Shopline</option>
+            </select>
+          </label>
+          <label>開始日期<input id="salesImportStart" type="date"></label>
+          <label>結束日期<input id="salesImportEnd" type="date"></label>
+        </section>
         <div class="import-grid">
-          <section class="card import-card"><h2>上傳銷售 / 商品 CSV・Excel</h2><div class="import-controls"><input id="excelFile" type="file" accept=".xlsx,.xls,.csv"><select id="importMode"><option value="upsert">相同規格編號：更新</option><option value="skip">相同規格編號：略過</option></select><button id="importBtn">匯入檔案</button></div><p class="muted">銷售報表讀取：商品管理編號 (Base SKU)、頁面檢視、售出單位、訂單計數、訂單號碼、顧客已付金額、運費。營業額與已收運費以「訂單號碼」去重，同一訂單只計一次。</p><p class="muted">商品主檔讀取：商品規格管理編號、商品管理編號、商品標題、商品網址、RTWBase SKU、參考URL #1 等欄位。</p><span id="importStatus" class="muted"></span></section>
-          <section class="card import-card"><h2>上傳樂天廣告 CSV</h2><div class="import-controls"><input id="adsFile" type="file" accept=".xlsx,.xls,.csv"><button id="adsImportBtn">匯入廣告資料</button></div><p class="muted">讀取：日付、商品管理番号、CTR(%)、クリック数(合計)、実績額(合計)、売上金額(合計720時間)、売上件数(合計720時間)。</p><span id="adsImportStatus" class="muted"></span></section>
-          <section class="card import-card"><h2>上傳商品分析 CSV</h2><div class="import-controls"><label>資料月份<input id="analysisMonth" type="month"></label><input id="analysisFile" type="file" accept=".xlsx,.xls,.csv"><button id="analysisImportBtn">匯入商品分析</button></div><p class="muted">讀取：商品番号、売上、売上件数、売上個数、アクセス人数、新規購入件数、リピート購入件数、お気に入り登録ユーザ数、お気に入り総ユーザ数。CSV 無日期時以選擇月份保存。</p><span id="analysisImportStatus" class="muted"></span></section>
+          <section class="card import-card import-card-wide">
+            <h2>上傳銷售 / 商品 CSV・Excel</h2>
+            <div class="import-controls">
+              <input id="excelFile" type="file" accept=".xlsx,.xls,.csv">
+              <select id="importMode">
+                <option value="upsert">相同規格編號：更新</option>
+                <option value="skip">相同規格編號：略過</option>
+              </select>
+              <button id="importBtn">匯入檔案</button>
+            </div>
+            <div class="import-rule-box">
+              <h3>台灣樂天｜銷售報表讀取方式</h3>
+              <p class="muted">商品管理編號 (Base SKU)、訂單日期、頁面檢視、售出單位、訂單計數、訂單號碼、顧客已付金額、運費。</p>
+              <p class="muted">營業額與已收運費以「訂單號碼」去重，同一訂單的顧客已付金額與運費只計算一次。</p>
+            </div>
+            <div class="import-rule-box">
+              <h3>日安優物 Shopline｜銷售報表讀取方式</h3>
+              <p class="muted">訂單號碼 → 唯一訂單值；訂單日期 → 銷售日期；付款總金額 → 訂單營業額；運費 → 已收運費。</p>
+              <p class="muted">商品貨號 → 商品管理編號；商品結帳價格 → 商品層級營業額分配依據；數量 → 銷售商品數。</p>
+              <p class="muted">總營業額以訂單號碼去重後加總付款總金額，避免多商品訂單重複計算。</p>
+            </div>
+            <div class="import-rule-box">
+              <h3>商品主檔讀取方式</h3>
+              <p class="muted">商品規格管理編號、商品管理編號、商品標題、商品網址、RTWBase SKU、參考URL #1 等欄位。</p>
+            </div>
+            <span id="importStatus" class="muted"></span>
+          </section>
         </div>
       </section>
       </main>

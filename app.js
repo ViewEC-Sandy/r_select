@@ -28,8 +28,8 @@ const IMPORT_ALIASES = {
 };
 const DEFAULT_PARAMS = { productCostRate:.2, freeDomesticJPY:3980, domesticShippingJPY:800, platformFeeRate:.12, targetProfitRate:.3, customerShippingPerKgTWD:199, freeShippingTWD:5000, uniFirstKgTWD:205, uniEachHalfKgTWD:102.5, nisshinRate:.2, nisshinDiscount:.85, nisshinFixedFeeTWD:82, tiers:[[.5,1450],[.6,1600],[.7,1750],[.8,1900],[.9,2050],[1,2200],[1.25,2500],[1.5,2800],[1.75,3100],[2,3400],[2.5,3900],[3,4400],[3.5,4900],[4,5400],[4.5,5900],[5,6400],[5.5,6900],[6,7400],[7,8200],[8,9000],[9,9800],[10,10600],[11,11400],[12,12200],[13,13000]] };
 const PARAM_DEFS = [['productCostRate','商品成本匯率'],['freeDomesticJPY','日本國內免運門檻(JPY)'],['domesticShippingJPY','預設日本國內運費(JPY)'],['platformFeeRate','平台費率'],['targetProfitRate','目標利潤率'],['customerShippingPerKgTWD','客收運費/公斤(TWD)'],['freeShippingTWD','台幣免運門檻(TWD)'],['uniFirstKgTWD','統一數網首重1kg(TWD)'],['uniEachHalfKgTWD','統一數網續重0.5kg(TWD)'],['nisshinRate','新日誠物流匯率'],['nisshinDiscount','新日誠物流折扣'],['nisshinFixedFeeTWD','新日誠物流固定作業費(TWD)']];
-const PLATFORMS=[{id:'taiwan_rakuten',name:'台灣樂天'},{id:'rianyou_shopify',name:'日安優物 Shopify'}];
-const MAINT_COLLECTIONS={products:'商品主檔',sales:'銷售',ads:'廣告',productAnalysis:'商品分析',imports:'匯入紀錄',platforms:'平台資料',stores:'店鋪資料'};
+const PLATFORMS=[{id:'taiwan_rakuten',name:'台灣樂天'},{id:'rianyou_shopify',name:'日安優物 Shopline'}];
+const MAINT_COLLECTIONS={products:'商品主檔',sales:'銷售',imports:'匯入紀錄',platforms:'平台資料',stores:'店鋪資料'};
 const DEFAULT_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','japanUrl','active','priceJPY','domesticShippingJPY','domesticShippingTWD','weightG','manualPriceTWD','profitTWD','profitRate'];
 const SALES_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','japanUrl','active','pageViews','unitsSold','orderCount','salesRevenueTWD','shippingReceivedTWD','conversionRate','manualPriceTWD','profitTWD','profitRate'];
 let products=[], stores=[], salesHistory=[], storeMap=new Map(), params={...DEFAULT_PARAMS}, visibleColumns=JSON.parse(localStorage.getItem('visibleColumns')||'null')||DEFAULT_COLUMNS, salesVisibleColumns=JSON.parse(localStorage.getItem('salesVisibleColumns')||'null')||SALES_COLUMNS, page=1; const PAGE_SIZE=50;
@@ -158,66 +158,186 @@ function normalizeDateValue(v){if(v instanceof Date&&!isNaN(v))return v.toISOStr
 async function importSalesReport(raw,fileName,selectedPlatform,manualStart='',manualEnd=''){
   const parsed=[];
   const orderMap=new Map();
+  const isShopline=selectedPlatform==='rianyou_shopify';
+
   for(const row of raw){
-    const base=cleanText(findRowValue(row,['商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU','商品管理編號']));
+    const base=cleanText(isShopline
+      ? findRowValue(row,['商品貨號','商品管理編號','Base SKU'])
+      : findRowValue(row,['商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU','商品管理編號']));
     if(!base)continue;
-    const spec=cleanText(findRowValue(row,['商品規格管理編號','SKU','sku']));
-    const title=cleanText(findRowValue(row,['商品標題','商品名稱','商品名']));
-    const sourceDate=findRowValue(row,['日期','Date','資料日期','開始日期','日付']);
+
+    const spec=cleanText(findRowValue(row,['商品規格管理編號','SKU','sku','規格貨號']));
+    const title=cleanText(findRowValue(row,['商品標題','商品名稱','商品名','商品']));
+    const sourceDate=isShopline
+      ? findRowValue(row,['訂單日期','Order Date','Created at','日期'])
+      : findRowValue(row,['訂單日期','日期','Date','資料日期','開始日期','日付']);
     const date=cleanText(sourceDate)?normalizeDateValue(sourceDate):(manualEnd||manualStart||new Date().toISOString().slice(0,10));
+
     const pageViews=n(cleanNumber(findRowValue(row,['頁面檢視','頁面檢視總數'])));
-    const unitsSold=n(cleanNumber(findRowValue(row,['售出單位','銷售商品數','銷售數'])));
-    const orderCount=n(cleanNumber(findRowValue(row,['訂單計數','銷售訂單數'])));
+    const unitsSold=n(cleanNumber(isShopline
+      ? findRowValue(row,['數量','售出單位','銷售商品數'])
+      : findRowValue(row,['售出單位','銷售商品數','銷售數','數量'])));
+
     const orderNo=cleanText(findRowValue(row,['訂單號碼','訂單編號','Order ID','Order Number']));
-    const customerPaid=cleanNumber(findRowValue(row,['顧客已付金額','客戶已付金額','實付金額']));
+    const customerPaid=cleanNumber(isShopline
+      ? findRowValue(row,['付款總金額','顧客已付金額','實付金額'])
+      : findRowValue(row,['顧客已付金額','客戶已付金額','實付金額']));
     const shipping=cleanNumber(findRowValue(row,['運費','已收運費','Shipping']));
+    const lineRevenue=cleanNumber(isShopline
+      ? findRowValue(row,['商品結帳價格','商品成交價格','商品售價'])
+      : findRowValue(row,['商品結帳價格']));
+
+    const orderCountSource=cleanNumber(findRowValue(row,['訂單計數','銷售訂單數']));
+    const orderCount=isShopline?(orderNo?1:0):n(orderCountSource);
+
     const rtwBaseSku=cleanText(findRowValue(row,['RTWBase SKU','RTWBaseSKU']));
     const taiwanUrl=validUrl(findRowValue(row,['商品網址','台灣URL','台灣網址']));
     const japanUrl=validUrl(findRowValue(row,['參考URL #1','參考URL#1','日本URL','日本網址']));
     const storeCode=cleanText(findRowValue(row,['店舖編號','店鋪編號','樂天編號'])).toUpperCase()||extractStoreCode(base,spec);
     const storeUrl=validUrl(findRowValue(row,['網址','店舖網址','店鋪網址']));
-    const item={base,spec,title,date,pageViews,unitsSold,orderCount,orderNo,customerPaid,shipping,rtwBaseSku,taiwanUrl,japanUrl,storeCode,storeUrl};parsed.push(item);
-    if(orderNo){const ok=`${selectedPlatform}__${orderNo}`;const o=orderMap.get(ok)||{orderNo,customerPaid:null,shipping:null,totalWeight:0,items:[]};if(o.customerPaid===null&&customerPaid!==null)o.customerPaid=customerPaid;if(o.shipping===null&&shipping!==null)o.shipping=shipping;const weight=Math.max(1,unitsSold||1);o.totalWeight+=weight;o.items.push({item,weight});orderMap.set(ok,o)}
-  }
-  const orderAlloc=new Map();
-  for(const o of orderMap.values())for(const x of o.items){const share=x.weight/o.totalWeight;const key=x.item;orderAlloc.set(key,{revenue:(o.customerPaid??0)*share,shipping:(o.shipping??0)*share,orderDetail:{orderNo:o.orderNo,customerPaid:o.customerPaid??0,shipping:o.shipping??0}})}
-  const grouped=new Map();
-  for(const item of parsed){const key=`${item.date}__${item.base}`;const g=grouped.get(key)||{date:item.date,periodStart:manualStart||item.date,periodEnd:manualEnd||item.date,baseSKU:item.base,specManagementId:item.spec,title:item.title,pageViews:0,unitsSold:0,orderCount:0,revenueTWD:0,shippingReceivedTWD:0,orderDetails:[],rtwBaseSku:item.rtwBaseSku,taiwanUrl:item.taiwanUrl,japanUrl:item.japanUrl,storeCode:item.storeCode};g.pageViews+=item.pageViews;g.unitsSold+=item.unitsSold;g.orderCount+=item.orderCount;const a=orderAlloc.get(item);if(a){g.revenueTWD+=a.revenue;g.shippingReceivedTWD+=a.shipping;if(!g.orderDetails.some(o=>o.orderNo===a.orderDetail.orderNo))g.orderDetails.push(a.orderDetail)}if(!g.specManagementId&&item.spec)g.specManagementId=item.spec;if(!g.title&&item.title)g.title=item.title;if(!g.rtwBaseSku&&item.rtwBaseSku)g.rtwBaseSku=item.rtwBaseSku;if(!g.taiwanUrl&&item.taiwanUrl)g.taiwanUrl=item.taiwanUrl;if(!g.japanUrl&&item.japanUrl)g.japanUrl=item.japanUrl;if(!g.storeCode&&item.storeCode)g.storeCode=item.storeCode;grouped.set(key,g)}
-  if(!grouped.size)throw new Error('找不到「商品管理編號 (Base SKU)」或銷售數據欄位');
-  const productByBase=new Map();products.forEach(p=>{const k=cleanText(p.productManagementId);if(k){if(!productByBase.has(k))productByBase.set(k,[]);productByBase.get(k).push(p)}});
-  const productByRtw=new Map();products.forEach(p=>{const k=cleanText(p.rtwBaseSku);if(k)productByRtw.set(k,p)});
-  let matched=0,unmatched=0;const rows=[...grouped.values()];
-  for(let start=0;start<rows.length;start+=100){const batch=writeBatch(db);for(const r of rows.slice(start,start+100)){
-    let matches=productByBase.get(r.baseSKU)||[];if(!matches.length&&r.rtwBaseSku&&productByRtw.has(r.rtwBaseSku))matches=[productByRtw.get(r.rtwBaseSku)];
-    if(matches.length){matched++;const div=matches.length;for(const p of matches){const patch={pageViews:round(r.pageViews/div),unitsSold:round(r.unitsSold/div),orderCount:round(r.orderCount/div),updatedAt:serverTimestamp()};if(r.taiwanUrl)patch.taiwanUrl=r.taiwanUrl;if(r.japanUrl)patch.japanUrl=r.japanUrl;if(r.rtwBaseSku)patch.rtwBaseSku=r.rtwBaseSku;batch.set(doc(db,'products',p.id),patch,{merge:true})}}else unmatched++;
-    if(r.storeCode){const existing=storeMap.get(r.storeCode);const parsedRow=parsed.find(x=>x.base===r.baseSKU&&x.storeCode===r.storeCode&&x.storeUrl);if(parsedRow?.storeUrl)batch.set(doc(db,'stores',r.storeCode),{code:r.storeCode,url:parsedRow.storeUrl,name:existing?.name||'',shippingJPY:existing?.shippingJPY??params.domesticShippingJPY,updatedAt:serverTimestamp()},{merge:true})}
-    const sid=encodeURIComponent(`${r.date}_${selectedPlatform}_${r.baseSKU}`).replaceAll('%','_');batch.set(doc(db,'sales',sid),{...r,revenueTWD:round(r.revenueTWD),shippingReceivedTWD:round(r.shippingReceivedTWD),platform:selectedPlatform,fileName,importedAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
-  }await batch.commit()}
-  await addDoc(collection(db,'imports'),{type:'sales',fileName,rowCount:raw.length,successCount:matched,skippedCount:unmatched,periodStart:manualStart||'',periodEnd:manualEnd||'',createdAt:serverTimestamp()});return{matched,unmatched};
-}
 
+    const item={base,spec,title,date,pageViews,unitsSold,orderCount,orderNo,customerPaid,shipping,lineRevenue,rtwBaseSku,taiwanUrl,japanUrl,storeCode,storeUrl};
+    parsed.push(item);
+
+    if(orderNo){
+      const ok=`${selectedPlatform}__${orderNo}`;
+      const o=orderMap.get(ok)||{orderNo,customerPaid:null,shipping:null,totalWeight:0,items:[]};
+      if(o.customerPaid===null&&customerPaid!==null)o.customerPaid=customerPaid;
+      if(o.shipping===null&&shipping!==null)o.shipping=shipping;
+      const weight=isShopline&&lineRevenue!==null&&Number.isFinite(Number(lineRevenue))
+        ? Math.max(0.000001,n(lineRevenue))
+        : Math.max(1,unitsSold||1);
+      o.totalWeight+=weight;
+      o.items.push({item,weight});
+      orderMap.set(ok,o);
+    }
+  }
+
+  const orderAlloc=new Map();
+  for(const o of orderMap.values()){
+    for(const x of o.items){
+      const share=o.totalWeight?x.weight/o.totalWeight:0;
+      orderAlloc.set(x.item,{
+        revenue:(o.customerPaid??0)*share,
+        shipping:(o.shipping??0)*share,
+        orderDetail:{orderNo:o.orderNo,customerPaid:o.customerPaid??0,shipping:o.shipping??0}
+      });
+    }
+  }
+
+  const grouped=new Map();
+  for(const item of parsed){
+    const key=`${item.date}__${item.base}`;
+    const g=grouped.get(key)||{
+      date:item.date,periodStart:manualStart||item.date,periodEnd:manualEnd||item.date,
+      baseSKU:item.base,specManagementId:item.spec,title:item.title,
+      pageViews:0,unitsSold:0,orderCount:0,revenueTWD:0,shippingReceivedTWD:0,
+      orderDetails:[],_orderNos:new Set(),
+      rtwBaseSku:item.rtwBaseSku,taiwanUrl:item.taiwanUrl,japanUrl:item.japanUrl,storeCode:item.storeCode
+    };
+    g.pageViews+=item.pageViews;
+    g.unitsSold+=item.unitsSold;
+
+    if(isShopline){
+      if(item.orderNo)g._orderNos.add(item.orderNo);
+    }else{
+      g.orderCount+=item.orderCount;
+    }
+
+    const a=orderAlloc.get(item);
+    if(a){
+      g.revenueTWD+=a.revenue;
+      g.shippingReceivedTWD+=a.shipping;
+      if(!g.orderDetails.some(o=>o.orderNo===a.orderDetail.orderNo))g.orderDetails.push(a.orderDetail);
+    }else if(isShopline&&item.lineRevenue!==null){
+      g.revenueTWD+=n(item.lineRevenue);
+    }
+
+    if(!g.specManagementId&&item.spec)g.specManagementId=item.spec;
+    if(!g.title&&item.title)g.title=item.title;
+    if(!g.rtwBaseSku&&item.rtwBaseSku)g.rtwBaseSku=item.rtwBaseSku;
+    if(!g.taiwanUrl&&item.taiwanUrl)g.taiwanUrl=item.taiwanUrl;
+    if(!g.japanUrl&&item.japanUrl)g.japanUrl=item.japanUrl;
+    if(!g.storeCode&&item.storeCode)g.storeCode=item.storeCode;
+    grouped.set(key,g);
+  }
+
+  for(const g of grouped.values()){
+    if(isShopline)g.orderCount=g._orderNos.size;
+    delete g._orderNos;
+  }
+
+  if(!grouped.size)throw new Error(isShopline
+    ? '找不到「商品貨號」或 Shopline 銷售欄位'
+    : '找不到「商品管理編號 (Base SKU)」或銷售數據欄位');
+
+  const productByBase=new Map();
+  products.forEach(p=>{
+    const k=cleanText(p.productManagementId);
+    if(k){
+      if(!productByBase.has(k))productByBase.set(k,[]);
+      productByBase.get(k).push(p);
+    }
+  });
+  const productByRtw=new Map();
+  products.forEach(p=>{const k=cleanText(p.rtwBaseSku);if(k)productByRtw.set(k,p)});
+
+  let matched=0,unmatched=0;
+  const rows=[...grouped.values()];
+  for(let start=0;start<rows.length;start+=100){
+    const batch=writeBatch(db);
+    for(const r of rows.slice(start,start+100)){
+      let matches=productByBase.get(r.baseSKU)||[];
+      if(!matches.length&&r.rtwBaseSku&&productByRtw.has(r.rtwBaseSku))matches=[productByRtw.get(r.rtwBaseSku)];
+
+      if(matches.length){
+        matched++;
+        const div=matches.length;
+        for(const p of matches){
+          const patch={
+            pageViews:round(r.pageViews/div),
+            unitsSold:round(r.unitsSold/div),
+            orderCount:round(r.orderCount/div),
+            updatedAt:serverTimestamp()
+          };
+          if(r.taiwanUrl)patch.taiwanUrl=r.taiwanUrl;
+          if(r.japanUrl)patch.japanUrl=r.japanUrl;
+          if(r.rtwBaseSku)patch.rtwBaseSku=r.rtwBaseSku;
+          batch.set(doc(db,'products',p.id),patch,{merge:true});
+        }
+      }else unmatched++;
+
+      if(r.storeCode){
+        const existing=storeMap.get(r.storeCode);
+        const parsedRow=parsed.find(x=>x.base===r.baseSKU&&x.storeCode===r.storeCode&&x.storeUrl);
+        if(parsedRow?.storeUrl)batch.set(doc(db,'stores',r.storeCode),{
+          code:r.storeCode,url:parsedRow.storeUrl,name:existing?.name||'',
+          shippingJPY:existing?.shippingJPY??params.domesticShippingJPY,
+          updatedAt:serverTimestamp()
+        },{merge:true});
+      }
+
+      const sid=encodeURIComponent(`${r.date}_${selectedPlatform}_${r.baseSKU}`).replaceAll('%','_');
+      batch.set(doc(db,'sales',sid),{
+        ...r,revenueTWD:round(r.revenueTWD),shippingReceivedTWD:round(r.shippingReceivedTWD),
+        platform:selectedPlatform,fileName,importedAt:serverTimestamp(),updatedAt:serverTimestamp()
+      },{merge:true});
+    }
+    await batch.commit();
+  }
+
+  await addDoc(collection(db,'imports'),{
+    type:'sales',fileName,rowCount:raw.length,successCount:matched,skippedCount:unmatched,
+    periodStart:manualStart||'',periodEnd:manualEnd||'',platform:selectedPlatform,createdAt:serverTimestamp()
+  });
+  return{matched,unmatched};
+}
 async function readSpreadsheetFile(file){
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheet=wb.Sheets[wb.SheetNames[0]];
   return XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});
 }
-async function importAdsReport(){
-  const file=$('adsFile')?.files?.[0];if(!file)return toast('請先選擇樂天廣告 CSV / Excel');
-  const rows=await readSpreadsheetFile(file);let done=0;
-  for(let i=0;i<rows.length;i+=400){const batch=writeBatch(db);for(const row of rows.slice(i,i+400)){
-    const date=normalizeDateValue(findRowValue(row,['日付','日期','Date']));
-    const productManagementId=cleanText(findRowValue(row,['商品管理番号','商品管理編號','商品管理番号（商品URL）']));if(!productManagementId)continue;
-    const id=encodeURIComponent(`${date}_${productManagementId}`).replaceAll('%','_');
-    batch.set(doc(db,'ads',id),{date,productManagementId,ctr:cleanNumber(findRowValue(row,['CTR(%)','CTR'])),clicks:n(cleanNumber(findRowValue(row,['クリック数(合計)','クリック数']))),spend:n(cleanNumber(findRowValue(row,['実績額(合計)','実績額']))),sales720:n(cleanNumber(findRowValue(row,['売上金額(合計720時間)','売上金額']))),orders720:n(cleanNumber(findRowValue(row,['売上件数(合計720時間)','売上件数']))),fileName:file.name,updatedAt:serverTimestamp()},{merge:true});done++;
-  }await batch.commit()}await addDoc(collection(db,'imports'),{type:'ads',fileName:file.name,rowCount:rows.length,successCount:done,createdAt:serverTimestamp()});$('adsImportStatus').textContent=`完成：${done} 筆`;toast('樂天廣告資料匯入完成')
-}
-async function importProductAnalysisReport(){
-  const file=$('analysisFile')?.files?.[0];if(!file)return toast('請先選擇商品分析 CSV / Excel');const month=$('analysisMonth')?.value||new Date().toISOString().slice(0,7);const rows=await readSpreadsheetFile(file);let done=0;
-  for(let i=0;i<rows.length;i+=400){const batch=writeBatch(db);for(const row of rows.slice(i,i+400)){
-    const productNo=cleanText(findRowValue(row,['商品番号','商品編號','商品管理番号']));if(!productNo)continue;const id=encodeURIComponent(`${month}_${productNo}`).replaceAll('%','_');
-    batch.set(doc(db,'productAnalysis',id),{month,productNo,sales:n(cleanNumber(findRowValue(row,['売上','營業額']))),salesOrders:n(cleanNumber(findRowValue(row,['売上件数']))),units:n(cleanNumber(findRowValue(row,['売上個数']))),accessUsers:n(cleanNumber(findRowValue(row,['アクセス人数']))),newBuyers:n(cleanNumber(findRowValue(row,['新規購入件数']))),repeatBuyers:n(cleanNumber(findRowValue(row,['リピート購入件数']))),favoriteUsers:n(cleanNumber(findRowValue(row,['お気に入り登録ユーザ数']))),favoriteTotalUsers:n(cleanNumber(findRowValue(row,['お気に入り総ユーザ数']))),fileName:file.name,updatedAt:serverTimestamp()},{merge:true});done++;
-  }await batch.commit()}await addDoc(collection(db,'imports'),{type:'productAnalysis',fileName:file.name,rowCount:rows.length,successCount:done,month,createdAt:serverTimestamp()});$('analysisImportStatus').textContent=`完成：${done} 筆`;toast('商品分析資料匯入完成')
-}
-async function importExcel(){const file=$('excelFile').files[0];if(!file)return toast('請先選擇 Excel 或 CSV 檔案');$('importBtn').disabled=true;$('importStatus').textContent='讀取中…';try{const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'}),preferred=wb.SheetNames.find(x=>x.toLowerCase()==='model')||wb.SheetNames[0];const raw=XLSX.utils.sheet_to_json(wb.Sheets[preferred],{defval:'',raw:false});if(!raw.length)throw new Error('檔案沒有資料');const hasBase=raw.some(row=>findHeader(row,['商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU'])!==null);const hasMetrics=raw.some(row=>findHeader(row,['頁面檢視'])!==null||findHeader(row,['售出單位'])!==null||findHeader(row,['訂單計數'])!==null||findHeader(row,['顧客已付金額'])!==null||findHeader(row,['訂單號碼'])!==null);if(hasBase&&hasMetrics){const result=await importSalesReport(raw,file.name,$('importPlatform').value,$('salesImportStart').value,$('salesImportEnd').value);$('importStatus').textContent=`銷售資料完成：對應 ${result.matched} 個商品，未對應 ${result.unmatched} 個`;toast('銷售報表匯入完成');await loadAll();return}const rows=normalizeImportRows(raw);if(!rows.length)throw new Error('找不到有效的商品規格管理編號');const existing=new Map(products.filter(p=>p.specManagementId).map(p=>[cleanText(p.specManagementId),p]));let done=0,skipped=raw.length-rows.length;for(let start=0;start<rows.length;start+=400){const batch=writeBatch(db);for(const row of rows.slice(start,start+400)){const selectedPlatform=$('importPlatform').value,data={active:true,overrides:{},platformData:{[selectedPlatform]:{enabled:true,active:true,price:null,note:''}},...row};data.priceJPY=cleanNumber(data.priceJPY);data.weightG=cleanNumber(data.weightG);data.pageViews=n(cleanNumber(data.pageViews));data.unitsSold=n(cleanNumber(data.unitsSold));data.orderCount=n(cleanNumber(data.orderCount));const key=cleanText(data.specManagementId),old=existing.get(key);if(old&&$('importMode').value==='skip'){skipped++;continue}const ref=old?doc(db,'products',old.id):doc(collection(db,'products'));const merged=old?{...data,active:old.active??true,note:data.note||old.note||'',overrides:old.overrides||{},platformData:{...(old.platformData||{}),...(data.platformData||{})},updatedAt:serverTimestamp()}:{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};batch.set(ref,merged,{merge:true});done++}await batch.commit()}await addDoc(collection(db,'imports'),{type:'products',fileName:file.name,rowCount:raw.length,successCount:done,skippedCount:skipped,createdAt:serverTimestamp()});$('importStatus').textContent=`完成：${done} 筆，略過 ${skipped} 筆`;toast('商品匯入完成');await loadAll()}catch(e){console.error(e);$('importStatus').textContent='匯入失敗：'+e.message}finally{$('importBtn').disabled=false}}
+
+async function importExcel(){const file=$('excelFile').files[0];if(!file)return toast('請先選擇 Excel 或 CSV 檔案');$('importBtn').disabled=true;$('importStatus').textContent='讀取中…';try{const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'}),preferred=wb.SheetNames.find(x=>x.toLowerCase()==='model')||wb.SheetNames[0];const raw=XLSX.utils.sheet_to_json(wb.Sheets[preferred],{defval:'',raw:false});if(!raw.length)throw new Error('檔案沒有資料');const selectedPlatform=$('importPlatform').value;const isShopline=selectedPlatform==='rianyou_shopify';const hasBase=raw.some(row=>findHeader(row,isShopline?['商品貨號','商品管理編號']:['商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU'])!==null);const hasMetrics=raw.some(row=>isShopline?(findHeader(row,['訂單號碼'])!==null&&findHeader(row,['付款總金額'])!==null):(findHeader(row,['頁面檢視'])!==null||findHeader(row,['售出單位'])!==null||findHeader(row,['訂單計數'])!==null||findHeader(row,['顧客已付金額'])!==null||findHeader(row,['訂單號碼'])!==null));if(hasBase&&hasMetrics){const result=await importSalesReport(raw,file.name,$('importPlatform').value,$('salesImportStart').value,$('salesImportEnd').value);$('importStatus').textContent=`銷售資料完成：對應 ${result.matched} 個商品，未對應 ${result.unmatched} 個`;toast('銷售報表匯入完成');await loadAll();return}const rows=normalizeImportRows(raw);if(!rows.length)throw new Error('找不到有效的商品規格管理編號');const existing=new Map(products.filter(p=>p.specManagementId).map(p=>[cleanText(p.specManagementId),p]));let done=0,skipped=raw.length-rows.length;for(let start=0;start<rows.length;start+=400){const batch=writeBatch(db);for(const row of rows.slice(start,start+400)){const data={active:true,overrides:{},platformData:{[selectedPlatform]:{enabled:true,active:true,price:null,note:''}},...row};data.priceJPY=cleanNumber(data.priceJPY);data.weightG=cleanNumber(data.weightG);data.pageViews=n(cleanNumber(data.pageViews));data.unitsSold=n(cleanNumber(data.unitsSold));data.orderCount=n(cleanNumber(data.orderCount));const key=cleanText(data.specManagementId),old=existing.get(key);if(old&&$('importMode').value==='skip'){skipped++;continue}const ref=old?doc(db,'products',old.id):doc(collection(db,'products'));const merged=old?{...data,active:old.active??true,note:data.note||old.note||'',overrides:old.overrides||{},platformData:{...(old.platformData||{}),...(data.platformData||{})},updatedAt:serverTimestamp()}:{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};batch.set(ref,merged,{merge:true});done++}await batch.commit()}await addDoc(collection(db,'imports'),{type:'products',fileName:file.name,rowCount:raw.length,successCount:done,skippedCount:skipped,createdAt:serverTimestamp()});$('importStatus').textContent=`完成：${done} 筆，略過 ${skipped} 筆`;toast('商品匯入完成');await loadAll()}catch(e){console.error(e);$('importStatus').textContent='匯入失敗：'+e.message}finally{$('importBtn').disabled=false}}
 
 function renderStores(){const q=cleanText($('storeSearch').value).toLowerCase();const list=stores.filter(s=>!q||[s.code,s.name,s.url,s.shippingJPY].some(v=>String(v||'').toLowerCase().includes(q)));$('storeTableBody').innerHTML=list.map(s=>`<tr><td>${esc(s.code)}</td><td>${esc(s.name||'')}</td><td>${format('japanUrl',s.url)}</td><td>${esc(s.shippingJPY??params.domesticShippingJPY)}</td><td class="action-cell"><button type="button" data-store-edit="${esc(s.id)}">編輯</button><button type="button" class="secondary" data-store-delete="${esc(s.id)}">刪除</button></td></tr>`).join('');$('storeCount').textContent=`共 ${list.length} 間店鋪`}
 function openStoreForm(store={}){$('storeId').value=store.id||'';$('storeCode').value=store.code||'';$('storeName').value=store.name||'';$('storeUrl').value=store.url||'';$('storeShipping').value=store.shippingJPY??params.domesticShippingJPY;$('storeFormTitle').textContent=store.id?'編輯店鋪':'新增店鋪';$('storeEditDialog').showModal()}
@@ -260,8 +380,6 @@ $('clearColumnFiltersBtn').onclick=()=>{columnFilters={};sortState={key:'',direc
 for(const id of ['crossStart','crossEnd','crossPlatformFilter'])if($(id))$(id).onchange=renderCrossPlatform;
 for(const id of ['platformStart','platformEnd','platformFilter'])if($(id))$(id).onchange=renderPlatformCompare;
 document.addEventListener('change',e=>{if(e.target.matches('[data-cross-sort]')&&e.target.value){crossSort={key:e.target.dataset.crossSort,direction:e.target.value};renderCrossPlatform()}if(e.target.matches('[data-platform-sort]')&&e.target.value){platformSort={key:e.target.dataset.platformSort,direction:e.target.value};renderPlatformCompare()}});
-if($('adsImportBtn'))$('adsImportBtn').onclick=()=>importAdsReport().catch(e=>{console.error(e);$('adsImportStatus').textContent='匯入失敗：'+e.message});
-if($('analysisImportBtn'))$('analysisImportBtn').onclick=()=>importProductAnalysisReport().catch(e=>{console.error(e);$('analysisImportStatus').textContent='匯入失敗：'+e.message});
 
 $('productTabBtn').onclick=()=>setView('products');if($('importTabBtn'))$('importTabBtn').onclick=()=>setView('imports');$('salesTabBtn').onclick=()=>{initSalesFilterDates();setView('sales')};$('overviewTabBtn').onclick=()=>{initOverviewDates();setView('overview')};$('crossPlatformTabBtn').onclick=()=>{initOverviewDates();setView('crossPlatform')};$('platformCompareTabBtn').onclick=()=>{initOverviewDates();setView('platformCompare')};$('applyOverviewBtn').onclick=renderOverview;$('overviewStart').onchange=renderOverview;$('overviewEnd').onchange=renderOverview;$('overviewPlatform').onchange=renderOverview;$('rankingSort').onchange=renderOverview;$('resetOverviewBtn').onclick=()=>{$('overviewStart').value='';$('overviewEnd').value='';$('overviewPlatform').value='all';renderOverview()};$('selectFilteredBtn').onclick=()=>{filtered().forEach(p=>selectedProductIds.add(p.id));renderTable();updateSelectionCount();toast('已選取全部篩選結果')};$('clearSelectionBtn').onclick=()=>{selectedProductIds.clear();renderTable();updateSelectionCount()};$('discountCalcBtn').onclick=openDiscountDialog;$('recalcDiscountBtn').onclick=renderDiscountResults;$('discountPercent').oninput=renderDiscountResults;$('exportDiscountBtn').onclick=exportDiscountResults;
 $('addProductBtn').onclick=()=>{renderProductForm({active:true});$('productDialog').showModal()};$('productForm').addEventListener('submit',async e=>{e.preventDefault();await saveProduct(e.currentTarget)});
