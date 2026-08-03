@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.3</small>
+        <small>Product Database V1.2.4</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -32,6 +32,7 @@
         <button id="salesTabBtn" type="button" class="side-nav-item">銷售狀態</button>
         <button id="crossPlatformTabBtn" type="button" class="side-nav-item">商品跨平台</button>
         <button id="platformCompareTabBtn" type="button" class="side-nav-item">平台比較</button>
+        <button id="importTabBtn" type="button" class="side-nav-item">資料匯入</button>
         <div class="nav-separator"></div>
         <button id="storeManagerBtn" type="button" class="side-nav-item">店鋪管理</button>
         <button id="openParamsBtn" type="button" class="side-nav-item">參數設定</button>
@@ -75,12 +76,6 @@
           <label class="sales-period">銷售結束<input id="salesFilterEnd" type="date"></label>
           <span class="muted">銷售狀態依匯入時設定的報表期間篩選</span>
         </div>
-        <div class="toolbar-row import-row">
-          <input id="excelFile" type="file" accept=".xlsx,.xls,.csv" />
-          <button id="importBtn">匯入 Excel</button><select id="importPlatform"><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select>
-          <select id="importMode"><option value="upsert">相同規格編號：更新</option><option value="skip">相同規格編號：略過</option></select>
-          <label class="sales-period">報表開始<input id="salesImportStart" type="date"></label><label class="sales-period">報表結束<input id="salesImportEnd" type="date"></label><span id="importStatus" class="muted"></span>
-        </div>
       </section>
 
       <section class="stats-grid">
@@ -89,6 +84,7 @@
         <article class="card stat"><span>平均利潤率</span><strong id="statMargin">0%</strong></article>
         <article class="card stat"><span>總銷售商品數</span><strong id="statUnits">0</strong></article>
         <article id="statRevenueCard" class="card stat hidden"><span>總營業額(TWD)</span><strong id="statRevenue">0</strong></article>
+        <article id="statShippingCard" class="card stat hidden"><span>已收運費(TWD)</span><strong id="statShipping">0</strong></article>
       </section>
 
       <section class="card table-card">
@@ -123,8 +119,17 @@
           <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
         </section>
       </section>
-      <section id="crossPlatformView" class="hidden overview-page"><section class="card"><h2>商品跨平台</h2><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead><tr><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>平台</th><th>營業額</th><th>銷量</th><th>訂單數</th></tr></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>
-      <section id="platformCompareView" class="hidden overview-page"><section class="card"><h2>平台比較</h2><div class="table-wrap"><table><thead><tr><th>平台</th><th>營業額</th><th>已收運費</th><th>銷量</th><th>訂單數</th><th>頁面檢視</th><th>轉換率</th></tr></thead><tbody id="platformCompareBody"></tbody></table></div></section></section>
+      <section id="crossPlatformView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>商品跨平台</h2><div class="period-filter"><label>開始日期<input id="crossStart" type="date"></label><label>結束日期<input id="crossEnd" type="date"></label><label>平台<select id="crossPlatformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select></label></div></div><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>已收運費</span><strong id="crossShipping">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead id="crossPlatformHead"></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>
+      <section id="platformCompareView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>平台比較</h2><div class="period-filter"><label>開始日期<input id="platformStart" type="date"></label><label>結束日期<input id="platformEnd" type="date"></label><label>平台<select id="platformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select></label></div></div><div class="table-wrap"><table><thead id="platformCompareHead"></thead><tbody id="platformCompareBody"></tbody></table></div></section></section>
+
+      <section id="importView" class="hidden overview-page import-page">
+        <section class="card overview-toolbar"><label>平台<select id="importPlatform"><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopify</option></select></label><label>開始日期<input id="salesImportStart" type="date"></label><label>結束日期<input id="salesImportEnd" type="date"></label></section>
+        <div class="import-grid">
+          <section class="card import-card"><h2>上傳銷售 / 商品 CSV・Excel</h2><div class="import-controls"><input id="excelFile" type="file" accept=".xlsx,.xls,.csv"><select id="importMode"><option value="upsert">相同規格編號：更新</option><option value="skip">相同規格編號：略過</option></select><button id="importBtn">匯入檔案</button></div><p class="muted">銷售報表讀取：商品管理編號 (Base SKU)、頁面檢視、售出單位、訂單計數、訂單號碼、顧客已付金額、運費。營業額與已收運費以「訂單號碼」去重，同一訂單只計一次。</p><p class="muted">商品主檔讀取：商品規格管理編號、商品管理編號、商品標題、商品網址、RTWBase SKU、參考URL #1 等欄位。</p><span id="importStatus" class="muted"></span></section>
+          <section class="card import-card"><h2>上傳樂天廣告 CSV</h2><div class="import-controls"><input id="adsFile" type="file" accept=".xlsx,.xls,.csv"><button id="adsImportBtn">匯入廣告資料</button></div><p class="muted">讀取：日付、商品管理番号、CTR(%)、クリック数(合計)、実績額(合計)、売上金額(合計720時間)、売上件数(合計720時間)。</p><span id="adsImportStatus" class="muted"></span></section>
+          <section class="card import-card"><h2>上傳商品分析 CSV</h2><div class="import-controls"><label>資料月份<input id="analysisMonth" type="month"></label><input id="analysisFile" type="file" accept=".xlsx,.xls,.csv"><button id="analysisImportBtn">匯入商品分析</button></div><p class="muted">讀取：商品番号、売上、売上件数、売上個数、アクセス人数、新規購入件数、リピート購入件数、お気に入り登録ユーザ数、お気に入り総ユーザ数。CSV 無日期時以選擇月份保存。</p><span id="analysisImportStatus" class="muted"></span></section>
+        </div>
+      </section>
       </main>
     </div>
   </div>
