@@ -225,8 +225,9 @@ function normalizeImportedNumericFields(row){
     '商品結帳價格','商品成交價格','商品售價','店鋪運費','店舖運費'
   ];
   const normalized={...row};
+  const numericHeaderSet=new Set(numericHeaders.map(h=>normalizeKey(h)));
   for(const key of Object.keys(normalized)){
-    if(numericHeaders.some(h=>normalizeHeader(h)===normalizeHeader(key))){
+    if(numericHeaderSet.has(normalizeKey(key))){
       const nval=cleanNumber(normalized[key]);
       if(nval!==null)normalized[key]=nval;
     }
