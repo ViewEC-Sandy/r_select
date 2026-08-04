@@ -215,6 +215,15 @@ async function saveProduct(form){const fd=new FormData(form),id=$('productId').v
 function findHeader(row,aliases){const normalized=Object.fromEntries(Object.keys(row).map(k=>[cleanHeader(k),k]));for(const a of aliases){const hit=normalized[cleanHeader(a)];if(hit!==undefined)return hit}return null}
 function normalizeImportRows(rows){let parent={productManagementId:'',title:'',note:'',taiwanUrl:'',japanUrl:'',rtwBaseSku:''};return rows.map(row=>{const data={};for(const [key,aliases] of Object.entries(IMPORT_ALIASES)){const h=findHeader(row,aliases);if(h!==null)data[key]=row[h]}for(const k of Object.keys(data))data[k]=typeof data[k]==='string'?cleanText(data[k]):data[k];for(const k of ['productManagementId','title','note','taiwanUrl','japanUrl','rtwBaseSku']){if(cleanText(data[k]))parent[k]=data[k];else data[k]=parent[k]}data.specManagementId=cleanText(data.specManagementId);data.productManagementId=cleanText(data.productManagementId);data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);return data}).filter(r=>r.specManagementId)}
 async function exportProducts(){const rows=products.map(p=>{const r={};FIELDS.forEach(([k,l])=>r[l]=p[k]??'');PLATFORMS.forEach(x=>{const d=p.platformData?.[x.id]||{};r[`${x.name}-啟用`]=!!d.enabled;r[`${x.name}-售價`]=d.price??'';r[`${x.name}-上架`]=d.active!==false;r[`${x.name}-備註`]=d.note??''});return r});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'商品主檔');XLSX.writeFile(wb,`商品資料庫_${new Date().toISOString().slice(0,10)}.xlsx`)}
+function normalizeImportHeader(v){
+  return String(v??'')
+    .replace(/\uFEFF/g,'')
+    .replace(/\u00A0/g,' ')
+    .replace(/[\s　\r\n\t]+/g,'')
+    .replace(/[（）]/g,m=>m==='（'?'(':')')
+    .trim()
+    .toLowerCase();
+}
 function normalizeImportedNumericFields(row){
   const numericHeaders=[
     '價格','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格',
@@ -225,9 +234,9 @@ function normalizeImportedNumericFields(row){
     '商品結帳價格','商品成交價格','商品售價','店鋪運費','店舖運費'
   ];
   const normalized={...row};
-  const numericHeaderSet=new Set(numericHeaders.map(h=>normalizeKey(h)));
+  const numericHeaderSet=new Set(numericHeaders.map(h=>normalizeImportHeader(h)));
   for(const key of Object.keys(normalized)){
-    if(numericHeaderSet.has(normalizeKey(key))){
+    if(numericHeaderSet.has(normalizeImportHeader(key))){
       const nval=cleanNumber(normalized[key]);
       if(nval!==null)normalized[key]=nval;
     }
