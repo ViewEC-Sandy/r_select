@@ -77,3 +77,11 @@ dialog{border-radius:12px}
   width: max-content;
   min-width: 100%;
 }
+
+/* V1.2.7 匯入進度 */
+.import-progress{
+  margin-top:14px;
+  min-height:22px;
+  font-weight:600;
+  color:#31527a;
+}

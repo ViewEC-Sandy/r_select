@@ -38,6 +38,13 @@ let crossSort={key:'revenue',direction:'desc'}, platformSort={key:'revenue',dire
 let sortState={key:'',direction:'asc'}, columnFilters={}, activeFilterKey='';
 const $=id=>document.getElementById(id); const n=v=>Number(v)||0; const round=v=>Math.round(v); const ceilKg=g=>Math.ceil(n(g)/1000);
 function toast(msg){$('toast').textContent=msg;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),2800)}
+function setImportProgress(message,percent=null){
+  const el=$('importStatus');
+  if(!el)return;
+  const pct=percent===null?'':` ${Math.max(0,Math.min(100,Math.round(percent)))}%`;
+  el.textContent=`${message}${pct}`;
+}
+function yieldToUI(){return new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)))}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function cleanText(v){return String(v??'').replace(/\u00a0/g,' ').replace(/\u3000/g,' ').replace(/[\r\n\t]+/g,' ').trim()}
 function cleanHeader(v){return cleanText(v).replace(/\s+/g,'').replace(/[（]/g,'(').replace(/[）]/g,')')}
@@ -351,10 +358,201 @@ async function readSpreadsheetFile(file){
   return XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});
 }
 
-async function importExcel(){const file=$('excelFile').files[0];if(!file)return toast('請先選擇 Excel 或 CSV 檔案');$('importBtn').disabled=true;$('importStatus').textContent='讀取中…';try{const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'}),preferred=wb.SheetNames.find(x=>x.toLowerCase()==='model')||wb.SheetNames[0];const raw=XLSX.utils.sheet_to_json(wb.Sheets[preferred],{defval:'',raw:false});if(!raw.length)throw new Error('檔案沒有資料');const selectedPlatform=$('importPlatform').value;const isShopline=selectedPlatform==='rianyou_shopify';const hasBase=raw.some(row=>findHeader(row,isShopline?['商品貨號','商品管理編號']:['商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU'])!==null);const hasMetrics=raw.some(row=>isShopline?(findHeader(row,['訂單號碼'])!==null&&findHeader(row,['付款總金額'])!==null):(findHeader(row,['頁面檢視'])!==null||findHeader(row,['售出單位'])!==null||findHeader(row,['訂單計數'])!==null||findHeader(row,['顧客已付金額'])!==null||findHeader(row,['訂單號碼'])!==null));if(hasBase&&hasMetrics){const result=await importSalesReport(raw,file.name,$('importPlatform').value,$('salesImportStart').value,$('salesImportEnd').value);$('importStatus').textContent=`銷售資料完成：對應 ${result.matched} 個商品，未對應 ${result.unmatched} 個`;toast('銷售報表匯入完成');await loadAll();return}const rows=normalizeImportRows(raw);if(!rows.length)throw new Error('找不到有效的商品規格管理編號');const existing=new Map(products.filter(p=>p.specManagementId).map(p=>[cleanText(p.specManagementId),p]));let done=0,skipped=raw.length-rows.length;for(let start=0;start<rows.length;start+=400){const batch=writeBatch(db);for(const row of rows.slice(start,start+400)){const data={active:true,overrides:{},platformData:{[selectedPlatform]:{enabled:true,active:true,price:null,note:''}},...row};data.priceJPY=cleanNumber(data.priceJPY);data.weightG=cleanNumber(data.weightG);data.pageViews=n(cleanNumber(data.pageViews));data.unitsSold=n(cleanNumber(data.unitsSold));data.orderCount=n(cleanNumber(data.orderCount));const key=cleanText(data.specManagementId),old=existing.get(key);if(old&&$('importMode').value==='skip'){skipped++;continue}const ref=old?doc(db,'products',old.id):doc(collection(db,'products'));const merged=old?{...data,active:old.active??true,note:data.note||old.note||'',overrides:old.overrides||{},platformData:{...(old.platformData||{}),...(data.platformData||{})},updatedAt:serverTimestamp()}:{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};batch.set(ref,merged,{merge:true});done++}await batch.commit()}await addDoc(collection(db,'imports'),{type:'products',fileName:file.name,rowCount:raw.length,successCount:done,skippedCount:skipped,createdAt:serverTimestamp()});
-const detectedPriceHeader=raw.length?findHeader(raw[0],IMPORT_ALIASES.priceJPY):null;
-$('importStatus').textContent=`完成：${done} 筆，略過 ${skipped} 筆`+(detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位');
-toast('商品匯入完成');await loadAll()}catch(e){console.error(e);$('importStatus').textContent='匯入失敗：'+e.message}finally{$('importBtn').disabled=false}}
+async function importExcel(){
+  const file=$('excelFile').files[0];
+  if(!file)return toast('請先選擇 Excel 或 CSV 檔案');
+
+  $('importBtn').disabled=true;
+  setImportProgress('準備讀取檔案…',2);
+
+  try{
+    await yieldToUI();
+
+    setImportProgress(`讀取檔案：${file.name}`,5);
+    const buf=await file.arrayBuffer();
+    await yieldToUI();
+
+    setImportProgress('解析 Excel / CSV…',10);
+    const wb=XLSX.read(buf,{type:'array'});
+    const preferred=wb.SheetNames.find(x=>x.toLowerCase()==='model')||wb.SheetNames[0];
+    if(!preferred||!wb.Sheets[preferred])throw new Error('找不到可讀取的工作表');
+
+    await yieldToUI();
+    setImportProgress(`解析工作表：${preferred}`,15);
+
+    const raw=XLSX.utils.sheet_to_json(wb.Sheets[preferred],{defval:'',raw:false});
+    if(!raw.length)throw new Error('檔案沒有資料');
+
+    setImportProgress(`已解析 ${raw.length.toLocaleString()} 列，判斷資料類型…`,20);
+    await yieldToUI();
+
+    const selectedPlatform=$('importPlatform').value;
+    const isShopline=selectedPlatform==='rianyou_shopify';
+
+    const hasBase=raw.some(row=>findHeader(
+      row,
+      isShopline?['商品貨號','商品管理編號']:['商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU']
+    )!==null);
+
+    const hasMetrics=raw.some(row=>isShopline
+      ? (findHeader(row,['訂單號碼'])!==null&&findHeader(row,['付款總金額'])!==null)
+      : (
+          findHeader(row,['頁面檢視'])!==null||
+          findHeader(row,['售出單位'])!==null||
+          findHeader(row,['訂單計數'])!==null||
+          findHeader(row,['顧客已付金額'])!==null||
+          findHeader(row,['訂單號碼'])!==null
+        )
+    );
+
+    // 銷售報表
+    if(hasBase&&hasMetrics){
+      setImportProgress(`辨識為銷售報表，共 ${raw.length.toLocaleString()} 列，開始寫入…`,25);
+      await yieldToUI();
+
+      const result=await importSalesReport(
+        raw,
+        file.name,
+        selectedPlatform,
+        $('salesImportStart').value,
+        $('salesImportEnd').value
+      );
+
+      setImportProgress(`銷售資料完成：對應 ${result.matched} 個商品，未對應 ${result.unmatched} 個`,100);
+      toast('銷售報表匯入完成');
+
+      await yieldToUI();
+      await loadAll();
+      return;
+    }
+
+    // 商品主檔
+    setImportProgress('辨識為商品主檔，整理欄位…',25);
+    await yieldToUI();
+
+    const rows=normalizeImportRows(raw);
+    if(!rows.length)throw new Error('找不到有效的商品規格管理編號');
+
+    const detectedPriceHeader=raw.length?findHeader(raw[0],IMPORT_ALIASES.priceJPY):null;
+    const existing=new Map(
+      products
+        .filter(p=>p.specManagementId)
+        .map(p=>[cleanText(p.specManagementId),p])
+    );
+
+    let done=0;
+    let skipped=raw.length-rows.length;
+    const BATCH_SIZE=300;
+    const totalBatches=Math.ceil(rows.length/BATCH_SIZE);
+
+    setImportProgress(
+      `商品主檔共 ${rows.length.toLocaleString()} 筆${detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'}`,
+      30
+    );
+    await yieldToUI();
+
+    for(let start=0,batchNo=1;start<rows.length;start+=BATCH_SIZE,batchNo++){
+      const batch=writeBatch(db);
+      const chunk=rows.slice(start,start+BATCH_SIZE);
+      let batchWrites=0;
+
+      for(const row of chunk){
+        const data={
+          active:true,
+          overrides:{},
+          platformData:{
+            [selectedPlatform]:{enabled:true,active:true,price:null,note:''}
+          },
+          ...row
+        };
+
+        data.priceJPY=cleanNumber(data.priceJPY);
+        data.weightG=cleanNumber(data.weightG);
+        data.pageViews=n(cleanNumber(data.pageViews));
+        data.unitsSold=n(cleanNumber(data.unitsSold));
+        data.orderCount=n(cleanNumber(data.orderCount));
+
+        const key=cleanText(data.specManagementId);
+        const old=existing.get(key);
+
+        if(old&&$('importMode').value==='skip'){
+          skipped++;
+          continue;
+        }
+
+        const ref=old?doc(db,'products',old.id):doc(collection(db,'products'));
+        const merged=old
+          ? {
+              ...data,
+              active:old.active??true,
+              note:data.note||old.note||'',
+              overrides:old.overrides||{},
+              platformData:{...(old.platformData||{}),...(data.platformData||{})},
+              updatedAt:serverTimestamp()
+            }
+          : {
+              ...data,
+              createdAt:serverTimestamp(),
+              updatedAt:serverTimestamp()
+            };
+
+        batch.set(ref,merged,{merge:true});
+        done++;
+        batchWrites++;
+      }
+
+      const progressBefore=30+((batchNo-1)/totalBatches)*60;
+      setImportProgress(
+        `寫入商品資料 ${Math.min(start+chunk.length,rows.length).toLocaleString()} / ${rows.length.toLocaleString()} 筆`,
+        progressBefore
+      );
+      await yieldToUI();
+
+      if(batchWrites>0)await batch.commit();
+
+      const progressAfter=30+(batchNo/totalBatches)*60;
+      setImportProgress(
+        `已完成 ${Math.min(start+chunk.length,rows.length).toLocaleString()} / ${rows.length.toLocaleString()} 筆`,
+        progressAfter
+      );
+      await yieldToUI();
+    }
+
+    setImportProgress('建立匯入紀錄…',92);
+    await addDoc(collection(db,'imports'),{
+      type:'products',
+      fileName:file.name,
+      rowCount:raw.length,
+      successCount:done,
+      skippedCount:skipped,
+      createdAt:serverTimestamp()
+    });
+
+    setImportProgress(
+      `商品匯入完成：${done.toLocaleString()} 筆，略過 ${skipped.toLocaleString()} 筆`+
+      (detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'),
+      96
+    );
+    toast('商品匯入完成');
+
+    // 先讓「完成」訊息顯示，再重新載入資料庫，避免畫面長時間停在「讀取中」。
+    await yieldToUI();
+    setImportProgress('重新載入商品資料…',98);
+    await loadAll();
+
+    setImportProgress(
+      `完成：${done.toLocaleString()} 筆，略過 ${skipped.toLocaleString()} 筆`+
+      (detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'),
+      100
+    );
+  }catch(e){
+    console.error('Import failed:',e);
+    setImportProgress(`匯入失敗：${e?.message||String(e)}`);
+    toast('匯入失敗，請查看錯誤訊息');
+  }finally{
+    $('importBtn').disabled=false;
+  }
+}
 
 function renderStores(){const q=cleanText($('storeSearch').value).toLowerCase();const list=stores.filter(s=>!q||[s.code,s.name,s.url,s.shippingJPY].some(v=>String(v||'').toLowerCase().includes(q)));$('storeTableBody').innerHTML=list.map(s=>`<tr><td>${esc(s.code)}</td><td>${esc(s.name||'')}</td><td>${format('japanUrl',s.url)}</td><td>${esc(s.shippingJPY??params.domesticShippingJPY)}</td><td class="action-cell"><button type="button" data-store-edit="${esc(s.id)}">編輯</button><button type="button" class="secondary" data-store-delete="${esc(s.id)}">刪除</button></td></tr>`).join('');$('storeCount').textContent=`共 ${list.length} 間店鋪`}
 function openStoreForm(store={}){$('storeId').value=store.id||'';$('storeCode').value=store.code||'';$('storeName').value=store.name||'';$('storeUrl').value=store.url||'';$('storeShipping').value=store.shippingJPY??params.domesticShippingJPY;$('storeFormTitle').textContent=store.id?'編輯店鋪':'新增店鋪';$('storeEditDialog').showModal()}
