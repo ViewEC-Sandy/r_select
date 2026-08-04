@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.8</small>
+        <small>Product Database V1.2.9</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -157,7 +157,7 @@
             </div>
             <div class="import-rule-box">
               <h3>商品主檔讀取方式</h3>
-              <p class="muted">商品規格管理編號、商品管理編號、商品標題、商品網址、RTWBase SKU、參考URL #1 等欄位。價格欄支援數字或文字格式（例如 33,239、￥33,239），並會自動轉換為數值。</p>
+              <p class="muted">商品規格管理編號、商品管理編號、商品標題、商品網址、RTWBase SKU、參考URL #1、價格等欄位。來源欄位【價格】會直接寫入【商品台幣售價(手動)】，再依參數設定中的【商品成本匯率】反算等值【日幣售價(JPY)】；例如價格 1,000 TWD、匯率 0.2 → 5,000 JPY。價格支援數字或文字格式（例如 1,000、NT$1,000）。</p>
             </div>
             <div id="importStatus" class="import-progress" role="status" aria-live="polite"></div>
           </section>

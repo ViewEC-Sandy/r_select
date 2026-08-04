@@ -23,7 +23,9 @@ const FIELD_MAP = Object.fromEntries(FIELDS.map(f=>[f[0],{key:f[0],label:f[1],ty
 const IMPORT_ALIASES = {
   specManagementId:['商品規格管理編號','SKU','sku'], productManagementId:['商品管理編號','商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU','商品編號'], title:['商品標題','商品名稱','商品名'],
   spec1:['規格1'], spec2:['規格2'], spec3:['規格3'], note:['備註'], taiwanUrl:['商品網址','台灣URL','台灣網址'], japanUrl:['參考URL #1','參考URL#1','日本URL','日本網址'], rtwBaseSku:['RTWBase SKU','RTWBaseSKU'],
-  priceJPY:['日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','售價','商品售價','商品價格','價格','販售價格','販売価格','価格'], weightG:['重量(g)','重量'], pageViews:['頁面檢視','頁面檢視總數','頁面檢視總數/月'],
+  priceJPY:['日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','日本售價','日本價格','JPY價格'],
+  manualPriceTWD:['價格','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格'],
+  weightG:['重量(g)','重量'], pageViews:['頁面檢視','頁面檢視總數','頁面檢視總數/月'],
   unitsSold:['售出單位','銷售商品數','銷售數'], orderCount:['訂單計數','銷售訂單數']
 };
 const DEFAULT_PARAMS = { productCostRate:.2, freeDomesticJPY:3980, domesticShippingJPY:800, platformFeeRate:.12, targetProfitRate:.3, customerShippingPerKgTWD:199, freeShippingTWD:5000, uniFirstKgTWD:205, uniEachHalfKgTWD:102.5, nisshinRate:.2, nisshinDiscount:.85, nisshinFixedFeeTWD:82, tiers:[[.5,1450],[.6,1600],[.7,1750],[.8,1900],[.9,2050],[1,2200],[1.25,2500],[1.5,2800],[1.75,3100],[2,3400],[2.5,3900],[3,4400],[3.5,4900],[4,5400],[4.5,5900],[5,6400],[5.5,6900],[6,7400],[7,8200],[8,9000],[9,9800],[10,10600],[11,11400],[12,12200],[13,13000]] };
@@ -434,7 +436,7 @@ async function importExcel(){
     const rows=normalizeImportRows(raw);
     if(!rows.length)throw new Error('找不到有效的商品規格管理編號');
 
-    const detectedPriceHeader=raw.length?findHeader(raw[0],IMPORT_ALIASES.priceJPY):null;
+    const detectedPriceHeader=raw.length?(findHeader(raw[0],IMPORT_ALIASES.manualPriceTWD)||findHeader(raw[0],IMPORT_ALIASES.priceJPY)):null;
     const existing=new Map(
       products
         .filter(p=>p.specManagementId)
@@ -447,7 +449,7 @@ async function importExcel(){
     const totalBatches=Math.ceil(rows.length/BATCH_SIZE);
 
     setImportProgress(
-      `商品主檔共 ${rows.length.toLocaleString()} 筆；將以每批 50 筆寫入${detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'}`,
+      `商品主檔共 ${rows.length.toLocaleString()} 筆；將以每批 50 筆寫入${detectedPriceHeader?`；讀取價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'}`,
       30
     );
     await yieldToUI();
@@ -467,7 +469,18 @@ async function importExcel(){
           ...row
         };
 
+        data.manualPriceTWD=cleanNumber(data.manualPriceTWD);
         data.priceJPY=cleanNumber(data.priceJPY);
+
+        // 公版商品主檔：來源欄位「價格」直接作為「商品台幣售價(手動)」。
+        // 再依目前參數的「商品成本匯率」反算等值日幣價格。
+        if(data.manualPriceTWD!==null&&Number.isFinite(Number(data.manualPriceTWD))){
+          data.priceJPY=params.productCostRate>0
+            ? Math.round(Number(data.manualPriceTWD)/Number(params.productCostRate))
+            : null;
+          data.overrides={...(data.overrides||{}),manualPriceTWD:true};
+        }
+
         data.weightG=cleanNumber(data.weightG);
         data.pageViews=n(cleanNumber(data.pageViews));
         data.unitsSold=n(cleanNumber(data.unitsSold));
@@ -487,7 +500,7 @@ async function importExcel(){
               ...data,
               active:old.active??true,
               note:data.note||old.note||'',
-              overrides:old.overrides||{},
+              overrides:{...(old.overrides||{}),...(data.overrides||{})},
               platformData:{...(old.platformData||{}),...(data.platformData||{})},
               updatedAt:serverTimestamp()
             }
@@ -543,7 +556,7 @@ async function importExcel(){
 
     setImportProgress(
       `商品匯入完成：${done.toLocaleString()} 筆，略過 ${skipped.toLocaleString()} 筆`+
-      (detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'),
+      (detectedPriceHeader?`；讀取價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'),
       96
     );
     toast('商品匯入完成');
@@ -555,7 +568,7 @@ async function importExcel(){
 
     setImportProgress(
       `完成：${done.toLocaleString()} 筆，略過 ${skipped.toLocaleString()} 筆`+
-      (detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'),
+      (detectedPriceHeader?`；讀取價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'),
       100
     );
   }catch(e){
