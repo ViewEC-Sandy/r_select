@@ -45,6 +45,7 @@ function setImportProgress(message,percent=null){
   el.textContent=`${message}${pct}`;
 }
 function yieldToUI(){return new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)))}
+async function withTimeout(promise,ms,message){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms)})])}finally{clearTimeout(timer)}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function cleanText(v){return String(v??'').replace(/\u00a0/g,' ').replace(/\u3000/g,' ').replace(/[\r\n\t]+/g,' ').trim()}
 function cleanHeader(v){return cleanText(v).replace(/\s+/g,'').replace(/[（]/g,'(').replace(/[）]/g,')')}
@@ -442,11 +443,11 @@ async function importExcel(){
 
     let done=0;
     let skipped=raw.length-rows.length;
-    const BATCH_SIZE=300;
+    const BATCH_SIZE=50;
     const totalBatches=Math.ceil(rows.length/BATCH_SIZE);
 
     setImportProgress(
-      `商品主檔共 ${rows.length.toLocaleString()} 筆${detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'}`,
+      `商品主檔共 ${rows.length.toLocaleString()} 筆；將以每批 50 筆寫入${detectedPriceHeader?`；價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'}`,
       30
     );
     await yieldToUI();
@@ -501,18 +502,30 @@ async function importExcel(){
         batchWrites++;
       }
 
-      const progressBefore=30+((batchNo-1)/totalBatches)*60;
-      setImportProgress(
-        `寫入商品資料 ${Math.min(start+chunk.length,rows.length).toLocaleString()} / ${rows.length.toLocaleString()} 筆`,
-        progressBefore
-      );
-      await yieldToUI();
-
-      if(batchWrites>0)await batch.commit();
+      if(batchWrites>0){
+        let committed=false;
+        let lastError=null;
+        for(let attempt=1;attempt<=3&&!committed;attempt++){
+          setImportProgress(
+            `正在寫入第 ${batchNo} / ${totalBatches} 批（${start+1}-${Math.min(start+chunk.length,rows.length)} 筆）${attempt>1?`，重試 ${attempt}/3`:''}`,
+            30+((batchNo-1)/totalBatches)*60
+          );
+          await yieldToUI();
+          try{
+            await withTimeout(batch.commit(),30000,`Firestore 寫入逾時：第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆超過 30 秒`);
+            committed=true;
+          }catch(err){
+            lastError=err;
+            console.error(`Batch ${batchNo} attempt ${attempt} failed`,err);
+            if(attempt<3){await new Promise(r=>setTimeout(r,1200*attempt));await yieldToUI()}
+          }
+        }
+        if(!committed)throw new Error(`商品資料第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆寫入失敗：${lastError?.message||'未知錯誤'}。建議先用範例檔測試 Firestore 寫入權限與網路。`);
+      }
 
       const progressAfter=30+(batchNo/totalBatches)*60;
       setImportProgress(
-        `已完成 ${Math.min(start+chunk.length,rows.length).toLocaleString()} / ${rows.length.toLocaleString()} 筆`,
+        `已成功寫入 ${Math.min(start+chunk.length,rows.length).toLocaleString()} / ${rows.length.toLocaleString()} 筆（第 ${batchNo}/${totalBatches} 批）`,
         progressAfter
       );
       await yieldToUI();
