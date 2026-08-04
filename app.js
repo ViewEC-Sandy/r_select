@@ -445,14 +445,27 @@ async function importExcel(){
 
     let done=0;
     let skipped=raw.length-rows.length;
-    const BATCH_SIZE=50;
+    const BATCH_SIZE=10;
     const totalBatches=Math.ceil(rows.length/BATCH_SIZE);
 
     setImportProgress(
-      `商品主檔共 ${rows.length.toLocaleString()} 筆；將以每批 50 筆寫入${detectedPriceHeader?`；讀取價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'}`,
+      `商品主檔共 ${rows.length.toLocaleString()} 筆；將以每批 10 筆寫入${detectedPriceHeader?`；讀取價格欄：${detectedPriceHeader}`:'；未偵測到價格欄位'}`,
       30
     );
     await yieldToUI();
+
+    const importStrategy=$('productImportStrategy')?.value||'fast';
+    // 正式大量匯入前先驗證 Firestore 是否能完成最小寫入與刪除。
+    setImportProgress('測試 Firestore 單筆寫入連線…',29);
+    await yieldToUI();
+    const probeRef=doc(db,'products',`__import_probe_${auth.currentUser?.uid||'user'}_${Date.now()}`);
+    try{
+      await withTimeout(setDoc(probeRef,{_probe:true,updatedAt:serverTimestamp()}),15000,'Firestore 單筆寫入測試超過 15 秒');
+      await withTimeout(deleteDoc(probeRef),15000,'Firestore 測試資料刪除超過 15 秒');
+    }catch(probeError){
+      const code=probeError?.code?` [${probeError.code}]`:'';
+      throw new Error(`Firestore 單筆寫入測試失敗${code}：${probeError?.message||probeError}。這不是商品欄位數量問題，請先檢查 Firestore Rules、網路或 Firebase 專案狀態。`);
+    }
 
     for(let start=0,batchNo=1;start<rows.length;start+=BATCH_SIZE,batchNo++){
       const chunk=rows.slice(start,start+BATCH_SIZE);
@@ -493,21 +506,37 @@ async function importExcel(){
           continue;
         }
 
-        const ref=old?doc(db,'products',old.id):doc(collection(db,'products'));
-        const merged=old
-          ? {
-              ...data,
-              active:old.active??true,
-              note:data.note||old.note||'',
-              overrides:{...(old.overrides||{}),...(data.overrides||{})},
-              platformData:{...(old.platformData||{}),...(data.platformData||{})},
-              updatedAt:serverTimestamp()
-            }
-          : {
-              ...data,
-              createdAt:serverTimestamp(),
-              updatedAt:serverTimestamp()
-            };
+        let ref,merged;
+        if(importStrategy==='fast'){
+          // 快速建立：固定 document ID，避免先查詢/比對大量文件；只寫商品主檔必要欄位。
+          const safeId=encodeURIComponent(key).replace(/%/g,'_').slice(0,1400);
+          ref=doc(db,'products',`sku_${safeId}`);
+          merged={
+            specManagementId:data.specManagementId||'',
+            productManagementId:data.productManagementId||'',
+            title:data.title||'',
+            spec1:data.spec1||'', spec2:data.spec2||'', spec3:data.spec3||'',
+            note:data.note||'', active:true,
+            manualPriceTWD:data.manualPriceTWD??null,
+            priceJPY:data.priceJPY??null,
+            weightG:data.weightG??null,
+            taiwanUrl:data.taiwanUrl||'', japanUrl:data.japanUrl||'',
+            rtwBaseSku:data.rtwBaseSku||'',
+            overrides:{manualPriceTWD:data.manualPriceTWD!==null},
+            platformData:{[selectedPlatform]:{enabled:true,active:true,price:null,note:''}},
+            updatedAt:serverTimestamp()
+          };
+        }else{
+          ref=old?doc(db,'products',old.id):doc(collection(db,'products'));
+          merged=old
+            ? {
+                ...data, active:old.active??true, note:data.note||old.note||'',
+                overrides:{...(old.overrides||{}),...(data.overrides||{})},
+                platformData:{...(old.platformData||{}),...(data.platformData||{})},
+                updatedAt:serverTimestamp()
+              }
+            : {...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+        }
 
         // 先保存本批次的寫入內容。重試時會建立全新的 WriteBatch，
         // 不可重用已呼叫 commit() 的 batch。
@@ -531,8 +560,8 @@ async function importExcel(){
             writeOps.forEach(op=>attemptBatch.set(op.ref,op.data,{merge:true}));
             await withTimeout(
               attemptBatch.commit(),
-              45000,
-              `Firestore 寫入逾時：第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆超過 45 秒`
+              20000,
+              `Firestore 寫入逾時：第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆超過 20 秒`
             );
             committed=true;
           }catch(err){
@@ -544,7 +573,7 @@ async function importExcel(){
             }
           }
         }
-        if(!committed)throw new Error(`商品資料第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆寫入失敗：${lastError?.message||'未知錯誤'}。`);
+        if(!committed){const code=lastError?.code?` [${lastError.code}]`:'';throw new Error(`商品資料第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆寫入失敗${code}：${lastError?.message||'未知錯誤'}。`);}
       }
 
       const progressAfter=30+(batchNo/totalBatches)*60;
@@ -558,6 +587,7 @@ async function importExcel(){
     setImportProgress('建立匯入紀錄…',92);
     await addDoc(collection(db,'imports'),{
       type:'products',
+      strategy:importStrategy,
       fileName:file.name,
       rowCount:raw.length,
       successCount:done,
