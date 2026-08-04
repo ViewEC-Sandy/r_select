@@ -88,6 +88,34 @@ function compute(base){
   Object.keys(values).forEach(k=>{if(ov[k])values[k]=p[k]});return {...p,...values};
 }
 function calcSuggested(j,k,o,weight){const target=params.targetProfitRate,denom=1-params.platformFeeRate-target;if(denom<=0)return null;const ship=ceilKg(weight)*params.customerShippingPerKgTWD;const candidate=((n(j)+n(k)+n(o))-ship*(1-target))/denom;return round(candidate>=params.freeShippingTWD?(n(j)+n(k)+n(o))/denom:candidate)}
+function reverseJPYFromTargetTWD(targetPriceTWD,weight,store){
+  const manual=Number(targetPriceTWD), rate=Number(params.productCostRate), target=Number(params.targetProfitRate);
+  if(!Number.isFinite(manual)||manual<=0||!Number.isFinite(rate)||rate<=0)return null;
+  const w=n(weight);
+  const method=w?(w<=600?'統一':'新日誠'):'';
+  const uni=w?(w<=1000?params.uniFirstKgTWD:params.uniFirstKgTWD+Math.ceil((w-1000)/500)*params.uniEachHalfKgTWD):0;
+  let nisshin=0;
+  if(w){const kg=w/1000;if(kg>13)return null;const tier=params.tiers.find(([max])=>kg<=max);nisshin=tier?round(tier[1]*params.nisshinRate*params.nisshinDiscount+params.nisshinFixedFeeTWD):0}
+  const fixed=method==='統一'?n(uni):method==='新日誠'?n(nisshin):0;
+  const customer=manual>=params.freeShippingTWD?0:ceilKg(w)*params.customerShippingPerKgTWD;
+  const gross=manual+customer;
+  const fee=manual*params.platformFeeRate;
+  const marginForJPY=jpy=>{
+    const productCost=jpy*rate;
+    const domesticJPY=jpy>=params.freeDomesticJPY?0:(n(store?.shippingJPY)||params.domesticShippingJPY);
+    const domestic=domesticJPY*rate;
+    const profit=gross-fee-fixed-productCost-domestic;
+    return gross?profit/gross:-Infinity;
+  };
+  // 找出使既有 Params 利潤率最接近目標利潤率的日幣價格。
+  let lo=0,hi=Math.max(params.freeDomesticJPY*2,manual/rate*2,10000);
+  while(marginForJPY(hi)>target&&hi<100000000)hi*=2;
+  for(let i=0;i<70;i++){const mid=(lo+hi)/2;if(marginForJPY(mid)>target)lo=mid;else hi=mid}
+  const candidates=[Math.floor(lo),Math.ceil(lo),Math.floor(hi),Math.ceil(hi),Math.floor(params.freeDomesticJPY-1),Math.ceil(params.freeDomesticJPY)].filter(x=>Number.isFinite(x)&&x>=0);
+  let best=null,bestDiff=Infinity;
+  for(const x of candidates){const diff=Math.abs(marginForJPY(x)-target);if(diff<bestDiff){best=x;bestDiff=diff}}
+  return best===null?null:Math.round(best);
+}
 function formatInteger(v){const value=Number(v);return Number.isFinite(value)?Math.round(value).toLocaleString('zh-TW'):esc(v)}
 function format(k,v){const t=FIELD_MAP[k]?.type;if(v===null||v===undefined||v==='')return '';if(k==='title'){const full=cleanText(v),shown=full.length>20?full.slice(0,20)+'…':full;return `<span class="title-cell" title="${esc(full)}">${esc(shown)}</span>`;}if(k==='storeCode'){const code=cleanText(v).toUpperCase(),url=validUrl(storeMap.get(code)?.url);return url?`<a class="url-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(code)} ↗</a>`:esc(code)}if(t==='url'){const url=validUrl(v);return url?`<a class="url-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">開啟 ↗</a>`:''}if(t==='percent')return(n(v)*100).toFixed(1)+'%';if(t==='number')return formatInteger(v);if(t==='boolean')return v?'<span class="badge">上架</span>':'<span class="badge off">下架</span>';return esc(v)}
 async function ensurePlatforms(){for(const x of PLATFORMS)await setDoc(doc(db,'platforms',x.id),{name:x.name,active:true,updatedAt:serverTimestamp()},{merge:true})}
@@ -484,12 +512,11 @@ async function importExcel(){
         data.manualPriceTWD=cleanNumber(data.manualPriceTWD);
         data.priceJPY=cleanNumber(data.priceJPY);
 
-        // 公版商品主檔：來源欄位「價格」直接作為「商品台幣售價(手動)」。
-        // 再依目前參數的「商品成本匯率」反算等值日幣價格。
+        // 來源欄位「價格」是已依目標利潤率制定的台幣售價。
+        // 不直接除以匯率；改用目前 Params 的完整利潤模型反推日幣價格。
         if(data.manualPriceTWD!==null&&Number.isFinite(Number(data.manualPriceTWD))){
-          data.priceJPY=params.productCostRate>0
-            ? Math.round(Number(data.manualPriceTWD)/Number(params.productCostRate))
-            : null;
+          const importStore=getStore(data);
+          data.priceJPY=reverseJPYFromTargetTWD(data.manualPriceTWD,data.weightG,importStore);
           data.overrides={...(data.overrides||{}),manualPriceTWD:true};
         }
 
