@@ -455,9 +455,8 @@ async function importExcel(){
     await yieldToUI();
 
     for(let start=0,batchNo=1;start<rows.length;start+=BATCH_SIZE,batchNo++){
-      const batch=writeBatch(db);
       const chunk=rows.slice(start,start+BATCH_SIZE);
-      let batchWrites=0;
+      const writeOps=[];
 
       for(const row of chunk){
         const data={
@@ -510,12 +509,13 @@ async function importExcel(){
               updatedAt:serverTimestamp()
             };
 
-        batch.set(ref,merged,{merge:true});
+        // 先保存本批次的寫入內容。重試時會建立全新的 WriteBatch，
+        // 不可重用已呼叫 commit() 的 batch。
+        writeOps.push({ref,data:merged});
         done++;
-        batchWrites++;
       }
 
-      if(batchWrites>0){
+      if(writeOps.length>0){
         let committed=false;
         let lastError=null;
         for(let attempt=1;attempt<=3&&!committed;attempt++){
@@ -525,15 +525,26 @@ async function importExcel(){
           );
           await yieldToUI();
           try{
-            await withTimeout(batch.commit(),30000,`Firestore 寫入逾時：第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆超過 30 秒`);
+            // 每一次嘗試都必須建立新的 WriteBatch。
+            // Firestore 的 WriteBatch 一旦 commit() 被呼叫，就不能再次使用。
+            const attemptBatch=writeBatch(db);
+            writeOps.forEach(op=>attemptBatch.set(op.ref,op.data,{merge:true}));
+            await withTimeout(
+              attemptBatch.commit(),
+              45000,
+              `Firestore 寫入逾時：第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆超過 45 秒`
+            );
             committed=true;
           }catch(err){
             lastError=err;
             console.error(`Batch ${batchNo} attempt ${attempt} failed`,err);
-            if(attempt<3){await new Promise(r=>setTimeout(r,1200*attempt));await yieldToUI()}
+            if(attempt<3){
+              await new Promise(r=>setTimeout(r,1500*attempt));
+              await yieldToUI();
+            }
           }
         }
-        if(!committed)throw new Error(`商品資料第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆寫入失敗：${lastError?.message||'未知錯誤'}。建議先用範例檔測試 Firestore 寫入權限與網路。`);
+        if(!committed)throw new Error(`商品資料第 ${start+1}-${Math.min(start+chunk.length,rows.length)} 筆寫入失敗：${lastError?.message||'未知錯誤'}。`);
       }
 
       const progressAfter=30+(batchNo/totalBatches)*60;
