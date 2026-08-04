@@ -245,6 +245,98 @@ function normalizeImportedNumericFields(row){
 }
 function findRowValue(row,aliases){const h=findHeader(row,aliases);return h===null?'':row[h]}
 function normalizeDateValue(v){if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);const s=cleanText(v);if(!s)return new Date().toISOString().slice(0,10);const d=new Date(s.replace(/[.\/]/g,'-'));return isNaN(d)?new Date().toISOString().slice(0,10):d.toISOString().slice(0,10)}
+async function importRakutenProductMetrics(raw,fileName,manualStart='',manualEnd=''){
+  const grouped=new Map();
+  for(const row of raw){
+    const base=cleanText(findRowValue(row,['商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU','商品管理編號']));
+    if(!base)continue;
+    const sales=n(cleanNumber(findRowValue(row,['銷售','売上','Sales'])));
+    const units=n(cleanNumber(findRowValue(row,['售出單位','銷售商品數','銷售數','數量'])));
+    const orders=n(cleanNumber(findRowValue(row,['訂單計數','銷售訂單數'])));
+    const sourceDate=findRowValue(row,['訂單日期','日期','Date','資料日期','開始日期','日付']);
+    const date=cleanText(sourceDate)?normalizeDateValue(sourceDate):(manualEnd||manualStart||new Date().toISOString().slice(0,10));
+    const key=`${date}__${base}`;
+    const g=grouped.get(key)||{date,baseSKU:base,salesAmount:0,unitsSold:0,orderCount:0};
+    g.salesAmount+=sales; g.unitsSold+=units; g.orderCount+=orders;
+    grouped.set(key,g);
+  }
+  if(!grouped.size)throw new Error('找不到【商品管理編號 (Base SKU)】或商品銷售數據');
+
+  const productByBase=new Map();
+  products.forEach(p=>{
+    const k=cleanText(p.productManagementId);
+    if(k){
+      if(!productByBase.has(k))productByBase.set(k,[]);
+      productByBase.get(k).push(p);
+    }
+  });
+
+  let matched=0,unmatched=0;
+  const rows=[...grouped.values()];
+  for(let start=0;start<rows.length;start+=100){
+    const batch=writeBatch(db);
+    for(const r of rows.slice(start,start+100)){
+      const matches=productByBase.get(r.baseSKU)||[];
+      if(matches.length){
+        matched++;
+        const div=matches.length;
+        for(const p of matches){
+          batch.set(doc(db,'products',p.id),{
+            salesAmount:round(r.salesAmount/div),
+            unitsSold:round(r.unitsSold/div),
+            orderCount:round(r.orderCount/div),
+            updatedAt:serverTimestamp()
+          },{merge:true});
+        }
+      }else unmatched++;
+
+      // 固定 ID：相同期間 + Base SKU 重複上傳只覆寫，不累加。
+      const sid=encodeURIComponent(`${r.date}_taiwan_rakuten_${r.baseSKU}_productmetrics`).replaceAll('%','_');
+      batch.set(doc(db,'sales',sid),{
+        date:r.date,periodStart:manualStart||r.date,periodEnd:manualEnd||r.date,
+        baseSKU:r.baseSKU,salesAmount:round(r.salesAmount),
+        // 商品層級銷售額保留獨立欄位；不混入唯一訂單營業額 revenueTWD。
+        productSalesTWD:round(r.salesAmount),
+        unitsSold:round(r.unitsSold),orderCount:round(r.orderCount),
+        revenueTWD:0,shippingReceivedTWD:0,pageViews:0,
+        platform:'taiwan_rakuten',dataType:'product_metrics',
+        fileName,importedAt:serverTimestamp(),updatedAt:serverTimestamp()
+      },{merge:true});
+    }
+    await batch.commit();
+  }
+  await addDoc(collection(db,'imports'),{
+    type:'rakuten_product_metrics',fileName,rowCount:raw.length,successCount:matched,skippedCount:unmatched,
+    periodStart:manualStart||'',periodEnd:manualEnd||'',platform:'taiwan_rakuten',createdAt:serverTimestamp()
+  });
+  return{matched,unmatched};
+}
+
+async function handleRakutenProductMetricsImport(){
+  const file=$('rakutenProductMetricsFile')?.files?.[0];
+  if(!file)return toast('請先選擇台灣樂天商品銷售數據檔案');
+  const btn=$('importRakutenProductMetricsBtn');
+  if(btn)btn.disabled=true;
+  try{
+    setImportProgress('讀取台灣樂天商品銷售數據…',5);
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    const raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false}).map(normalizeImportedNumericFields);
+    if(!raw.length)throw new Error('檔案沒有資料');
+    const start=$('salesImportStart')?.value||'', end=$('salesImportEnd')?.value||'';
+    setImportProgress(`已讀取 ${raw.length.toLocaleString()} 列，依 Base SKU 寫入…`,35);
+    const result=await importRakutenProductMetrics(raw,file.name,start,end);
+    setImportProgress(`商品銷售數據匯入完成：對應 ${result.matched.toLocaleString()} 筆，未對應 ${result.unmatched.toLocaleString()} 筆`,100);
+    await loadAll();
+    toast('台灣樂天商品銷售數據匯入完成');
+  }catch(e){
+    console.error(e);
+    setImportProgress(`匯入失敗：${e.message||e}`,100);
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+
 async function importSalesReport(raw,fileName,selectedPlatform,manualStart='',manualEnd=''){
   const parsed=[];
   const orderMap=new Map();
@@ -268,10 +360,10 @@ async function importSalesReport(raw,fileName,selectedPlatform,manualStart='',ma
       : findRowValue(row,['訂單日期','日期','Date','資料日期','開始日期','日付']);
     const date=cleanText(sourceDate)?normalizeDateValue(sourceDate):(manualEnd||manualStart||new Date().toISOString().slice(0,10));
 
-    const pageViews=n(cleanNumber(findRowValue(row,['頁面檢視','頁面檢視總數'])));
-    const unitsSold=n(cleanNumber(isShopline
-      ? findRowValue(row,['數量','售出單位','銷售商品數'])
-      : findRowValue(row,['售出單位','銷售商品數','銷售數','數量'])));
+    const pageViews=isShopline?n(cleanNumber(findRowValue(row,['頁面檢視','頁面檢視總數']))):0;
+    const unitsSold=isShopline
+      ? n(cleanNumber(findRowValue(row,['數量','售出單位','銷售商品數'])))
+      : 0;
 
     const orderNo=cleanText(findRowValue(row,['訂單號碼','訂單編號','Order ID','Order Number']));
     const customerPaid=cleanNumber(isShopline
@@ -283,7 +375,7 @@ async function importSalesReport(raw,fileName,selectedPlatform,manualStart='',ma
       : findRowValue(row,['商品結帳價格']));
 
     const orderCountSource=cleanNumber(findRowValue(row,['訂單計數','銷售訂單數']));
-    const orderCount=isShopline?(orderNo?1:0):n(orderCountSource);
+    const orderCount=isShopline?(orderNo?1:0):0;
 
     const rtwBaseSku=cleanText(findRowValue(row,['RTWBase SKU','RTWBaseSKU']));
     const taiwanUrl=validUrl(findRowValue(row,['商品網址','台灣URL','台灣網址']));
@@ -498,10 +590,8 @@ async function importExcel(){
     const hasMetrics=raw.some(row=>isShopline
       ? (findHeader(row,['訂單號碼'])!==null&&findHeader(row,['付款總金額'])!==null)
       : (
-          findHeader(row,['頁面檢視'])!==null||
-          findHeader(row,['售出單位'])!==null||
-          findHeader(row,['訂單計數'])!==null||
           findHeader(row,['顧客已付金額'])!==null||
+          findHeader(row,['運費'])!==null||
           findHeader(row,['訂單號碼'])!==null
         )
     );
@@ -774,3 +864,5 @@ $('storeTableBody').addEventListener('click',async e=>{const edit=e.target.datas
 $('maintenanceBtn').onclick=async()=>{$('maintenanceDialog').showModal();await refreshMaintenance()};$('deleteSelectedBtn').onclick=deleteSelectedCollections;$('clearAllBtn').onclick=clearImportedData;$('rebuildIndexBtn').onclick=rebuildProductIndex;$('recalcDashboardBtn').onclick=recalcDashboard;$('healthCheckBtn').onclick=()=>runHealthCheck(true);$('resyncMaintenanceBtn').onclick=resyncProducts;
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
 onAuthStateChanged(auth,async user=>{if(user){$('loginView').classList.add('hidden');$('appView').classList.remove('hidden');$('userEmail').textContent=user.email;await loadAll()}else{$('appView').classList.add('hidden');$('loginView').classList.remove('hidden')}});
+
+$('importRakutenProductMetricsBtn')?.addEventListener('click',handleRakutenProductMetricsImport);

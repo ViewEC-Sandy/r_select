@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.16</small>
+        <small>Product Database V1.2.17</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -149,8 +149,16 @@
               <button id="importBtn">匯入檔案</button>
             </div>
             <div class="import-rule-box">
-              <h3>台灣樂天｜銷售報表讀取方式</h3>
-              <p class="muted">商品管理編號 (Base SKU)、訂單日期、頁面檢視、售出單位、訂單計數、訂單號碼、顧客已付金額、運費、下載時的訂單狀態。</p>
+              <h3>台灣樂天｜商品銷售數據（獨立匯入）</h3>
+              <div class="import-controls">
+                <input id="rakutenProductMetricsFile" type="file" accept=".xlsx,.xls,.csv">
+                <button id="importRakutenProductMetricsBtn" type="button">匯入商品銷售數據</button>
+              </div>
+              <p class="muted">此報表不需要【訂單號碼】。以【商品管理編號 (Base SKU)】作為商品對應依據，獨立讀取【銷售】【售出單位】【訂單計數】。日期使用上方「開始日期／結束日期」；重複上傳相同期間、相同 Base SKU 時會覆寫原資料，不會累加。</p>
+            </div>
+            <div class="import-rule-box">
+              <h3>台灣樂天｜訂單銷售報表讀取方式</h3>
+              <p class="muted">訂單號碼、訂單日期、顧客已付金額、運費、下載時的訂單狀態。此區負責唯一訂單、總營業額與已收運費；【銷售】【售出單位】【訂單計數】改由上方「商品銷售數據」獨立匯入。</p>
               <p class="muted">以【訂單號碼】作為唯一訂單識別值：同一訂單即使在報表中有多個商品列，訂單數、顧客已付金額與運費都只計算一次；重複上傳同一訂單時會更新既有訂單，不會新增第二筆，因此不會重複計入營業額、已收運費或訂單數。「下載時的訂單狀態」為「已取消」的資料不列入任何統計。</p>
             </div>
             <div class="import-rule-box">
