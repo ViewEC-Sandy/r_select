@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.12</small>
+        <small>Product Database V1.2.14</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -151,7 +151,7 @@
             <div class="import-rule-box">
               <h3>台灣樂天｜銷售報表讀取方式</h3>
               <p class="muted">商品管理編號 (Base SKU)、訂單日期、頁面檢視、售出單位、訂單計數、訂單號碼、顧客已付金額、運費、下載時的訂單狀態。</p>
-              <p class="muted">營業額與已收運費以「訂單號碼」去重，同一訂單的顧客已付金額與運費只計算一次；「下載時的訂單狀態」為「已取消」的資料不列入任何統計。</p>
+              <p class="muted">以【訂單號碼】作為唯一訂單識別值：同一訂單即使在報表中有多個商品列，訂單數、顧客已付金額與運費都只計算一次；重複上傳同一訂單時會更新既有訂單，不會新增第二筆，因此不會重複計入營業額、已收運費或訂單數。「下載時的訂單狀態」為「已取消」的資料不列入任何統計。</p>
             </div>
             <div class="import-rule-box">
               <h3>日安優物 Shopline｜銷售報表讀取方式</h3>
@@ -161,7 +161,7 @@
             </div>
             <div class="import-rule-box">
               <h3>商品主檔讀取方式</h3>
-              <p class="muted">商品規格管理編號、商品管理編號、商品標題、商品網址、RTWBase SKU、參考URL #1、價格等欄位。來源欄位【價格】會直接寫入【商品台幣售價(手動)】。此價格視為依目前【目標利潤率】制定的台幣售價，系統會依 Params 的平台費、商品成本匯率、日本國內運費、物流成本、客收運費與免運門檻等完整規則，反推【日幣售價(JPY)】，不再單純以台幣價格 ÷ 匯率換算。價格支援數字或文字格式（例如 1,000、NT$1,000）。</p><p class="muted">快速建立模式只寫入商品識別、標題/規格、台幣價格、換算日幣價格、重量與網址等主檔必要資料；完整更新模式保留既有合併邏輯。匯入前會先做 1 筆 Firestore 寫入/刪除連線測試。</p>
+              <p class="muted">商品規格管理編號、商品管理編號、商品標題、商品網址、RTWBase SKU、參考URL #1、價格等欄位。來源欄位【價格】會直接寫入【商品台幣售價(手動)】。此價格視為依目前【目標利潤率】制定的台幣售價，系統會依 Params 的平台費、商品成本匯率、日本國內運費、物流成本、客收運費與免運門檻等完整規則，反推【日幣售價(JPY)】，不再單純以台幣價格 ÷ 匯率換算。所有數值欄位在匯入時都會先自動轉成真正的 Number 再寫入 Firestore，即使來源 Excel 顯示「數字以文字儲存」也可讀取；支援例如 1,000、NT$1,000、￥5,000、全形數字等格式。商品編號、訂單號碼、SKU 等識別碼仍保留文字格式，避免前導 0 被吃掉。</p><p class="muted">快速建立模式只寫入商品識別、標題/規格、台幣價格、換算日幣價格、重量與網址等主檔必要資料；完整更新模式保留既有合併邏輯。匯入前會先做 1 筆 Firestore 寫入/刪除連線測試。</p>
             </div>
             <div id="importStatus" class="import-progress" role="status" aria-live="polite"></div>
           </section>

@@ -31,7 +31,7 @@ const IMPORT_ALIASES = {
 const DEFAULT_PARAMS = { productCostRate:.2, freeDomesticJPY:3980, domesticShippingJPY:800, platformFeeRate:.12, targetProfitRate:.3, customerShippingPerKgTWD:199, freeShippingTWD:5000, uniFirstKgTWD:205, uniEachHalfKgTWD:102.5, nisshinRate:.2, nisshinDiscount:.85, nisshinFixedFeeTWD:82, tiers:[[.5,1450],[.6,1600],[.7,1750],[.8,1900],[.9,2050],[1,2200],[1.25,2500],[1.5,2800],[1.75,3100],[2,3400],[2.5,3900],[3,4400],[3.5,4900],[4,5400],[4.5,5900],[5,6400],[5.5,6900],[6,7400],[7,8200],[8,9000],[9,9800],[10,10600],[11,11400],[12,12200],[13,13000]] };
 const PARAM_DEFS = [['productCostRate','商品成本匯率'],['freeDomesticJPY','日本國內免運門檻(JPY)'],['domesticShippingJPY','預設日本國內運費(JPY)'],['platformFeeRate','平台費率'],['targetProfitRate','目標利潤率'],['customerShippingPerKgTWD','客收運費/公斤(TWD)'],['freeShippingTWD','台幣免運門檻(TWD)'],['uniFirstKgTWD','統一數網首重1kg(TWD)'],['uniEachHalfKgTWD','統一數網續重0.5kg(TWD)'],['nisshinRate','新日誠物流匯率'],['nisshinDiscount','新日誠物流折扣'],['nisshinFixedFeeTWD','新日誠物流固定作業費(TWD)']];
 const PLATFORMS=[{id:'taiwan_rakuten',name:'台灣樂天'},{id:'rianyou_shopify',name:'日安優物 Shopline'}];
-const MAINT_COLLECTIONS={products:'商品主檔',sales:'銷售',imports:'匯入紀錄',platforms:'平台資料',stores:'店鋪資料'};
+const MAINT_COLLECTIONS={products:'商品主檔',sales:'銷售',orders:'唯一訂單',imports:'匯入紀錄',platforms:'平台資料',stores:'店鋪資料'};
 const DEFAULT_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','japanUrl','active','priceJPY','domesticShippingJPY','domesticShippingTWD','weightG','manualPriceTWD','profitTWD','profitRate'];
 const SALES_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','japanUrl','active','pageViews','unitsSold','orderCount','salesRevenueTWD','shippingReceivedTWD','conversionRate','manualPriceTWD','profitTWD','profitRate'];
 let products=[], stores=[], salesHistory=[], storeMap=new Map(), params={...DEFAULT_PARAMS}, visibleColumns=JSON.parse(localStorage.getItem('visibleColumns')||'null')||DEFAULT_COLUMNS, salesVisibleColumns=JSON.parse(localStorage.getItem('salesVisibleColumns')||'null')||SALES_COLUMNS, page=1; const PAGE_SIZE=50;
@@ -53,13 +53,28 @@ function cleanText(v){return String(v??'').replace(/\u00a0/g,' ').replace(/\u300
 function cleanHeader(v){return cleanText(v).replace(/\s+/g,'').replace(/[（]/g,'(').replace(/[）]/g,')')}
 function cleanNumber(v){
   if(v===null||v===undefined||v==='')return null;
-  // 可處理 Excel/CSV 中以文字儲存的數字，例如 "33,239"、"￥33,239"、全形數字與前後空白。
-  const fullWidthMap={'０':'0','１':'1','２':'2','３':'3','４':'4','５':'5','６':'6','７':'7','８':'8','９':'9','．':'.','－':'-'};
-  const normalized=String(v).replace(/[０-９．－]/g,ch=>fullWidthMap[ch]||ch);
-  const s=normalized.replace(/[¥￥$,，\s]/g,'').replace(/[^0-9.\-]/g,'');
-  if(s==='')return null;
+  if(typeof v==='number')return Number.isFinite(v)?v:null;
+
+  let s=String(v).trim();
+  if(!s)return null;
+
+  // Excel / CSV 常見「以文字儲存的數字」正規化。
+  const fw={'０':'0','１':'1','２':'2','３':'3','４':'4','５':'5','６':'6','７':'7','８':'8','９':'9','．':'.','－':'-','＋':'+','％':'%','，':','};
+  s=s.replace(/[０-９．－＋％，]/g,ch=>fw[ch]||ch).replace(/\u00A0/g,' ').trim();
+
+  // (1,234) 視為 -1234。
+  let negative=false;
+  if(/^\(.*\)$/.test(s)){negative=true;s=s.slice(1,-1)}
+
+  // 移除千分位、貨幣符號、一般文字，只保留數字、小數點與正負號。
+  s=s.replace(/[,，\s]/g,'')
+     .replace(/NT\$|TWD|JPY|USD|RMB|CNY|¥|￥|\$/gi,'')
+     .replace(/[^0-9.+-]/g,'');
+  if(!s||s==='-'||s==='+'||s==='.')return null;
+
   const value=Number(s);
-  return Number.isFinite(value)?value:null
+  if(!Number.isFinite(value))return null;
+  return negative?-Math.abs(value):value;
 }
 function validUrl(v){const s=cleanText(v);if(!s)return '';try{return new URL(s).href}catch{return /^www\./i.test(s)?`https://${s}`:''}}
 function extractStoreCode(...values){for(const value of values){const s=cleanText(value).toUpperCase();const m=s.match(/(?:^|[^A-Z0-9])(R\d{1,4})(?=[^A-Z0-9]|$)/i)||s.match(/^(R\d{1,4})/i);if(m)return m[1].toUpperCase()}return ''}
@@ -200,6 +215,24 @@ async function saveProduct(form){const fd=new FormData(form),id=$('productId').v
 function findHeader(row,aliases){const normalized=Object.fromEntries(Object.keys(row).map(k=>[cleanHeader(k),k]));for(const a of aliases){const hit=normalized[cleanHeader(a)];if(hit!==undefined)return hit}return null}
 function normalizeImportRows(rows){let parent={productManagementId:'',title:'',note:'',taiwanUrl:'',japanUrl:'',rtwBaseSku:''};return rows.map(row=>{const data={};for(const [key,aliases] of Object.entries(IMPORT_ALIASES)){const h=findHeader(row,aliases);if(h!==null)data[key]=row[h]}for(const k of Object.keys(data))data[k]=typeof data[k]==='string'?cleanText(data[k]):data[k];for(const k of ['productManagementId','title','note','taiwanUrl','japanUrl','rtwBaseSku']){if(cleanText(data[k]))parent[k]=data[k];else data[k]=parent[k]}data.specManagementId=cleanText(data.specManagementId);data.productManagementId=cleanText(data.productManagementId);data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);return data}).filter(r=>r.specManagementId)}
 async function exportProducts(){const rows=products.map(p=>{const r={};FIELDS.forEach(([k,l])=>r[l]=p[k]??'');PLATFORMS.forEach(x=>{const d=p.platformData?.[x.id]||{};r[`${x.name}-啟用`]=!!d.enabled;r[`${x.name}-售價`]=d.price??'';r[`${x.name}-上架`]=d.active!==false;r[`${x.name}-備註`]=d.note??''});return r});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'商品主檔');XLSX.writeFile(wb,`商品資料庫_${new Date().toISOString().slice(0,10)}.xlsx`)}
+function normalizeImportedNumericFields(row){
+  const numericHeaders=[
+    '價格','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格',
+    '日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','日本售價','日本價格','JPY價格',
+    '重量(g)','重量',
+    '頁面檢視','頁面檢視總數','售出單位','銷售商品數','銷售數','數量','訂單計數','銷售訂單數',
+    '顧客已付金額','客戶已付金額','實付金額','付款總金額','運費','已收運費','Shipping',
+    '商品結帳價格','商品成交價格','商品售價','店鋪運費','店舖運費'
+  ];
+  const normalized={...row};
+  for(const key of Object.keys(normalized)){
+    if(numericHeaders.some(h=>normalizeHeader(h)===normalizeHeader(key))){
+      const nval=cleanNumber(normalized[key]);
+      if(nval!==null)normalized[key]=nval;
+    }
+  }
+  return normalized;
+}
 function findRowValue(row,aliases){const h=findHeader(row,aliases);return h===null?'':row[h]}
 function normalizeDateValue(v){if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);const s=cleanText(v);if(!s)return new Date().toISOString().slice(0,10);const d=new Date(s.replace(/[.\/]/g,'-'));return isNaN(d)?new Date().toISOString().slice(0,10):d.toISOString().slice(0,10)}
 async function importSalesReport(raw,fileName,selectedPlatform,manualStart='',manualEnd=''){
@@ -290,11 +323,11 @@ async function importSalesReport(raw,fileName,selectedPlatform,manualStart='',ma
     g.pageViews+=item.pageViews;
     g.unitsSold+=item.unitsSold;
 
-    if(isShopline){
-      if(item.orderNo)g._orderNos.add(item.orderNo);
-    }else{
-      g.orderCount+=item.orderCount;
-    }
+    // 所有平台優先以「訂單號碼」認定唯一訂單。
+    // 同一訂單在同一檔案中出現多個商品列，只計 1 張訂單。
+    // 若來源沒有訂單號碼，才退回來源的「訂單計數」。
+    if(item.orderNo)g._orderNos.add(item.orderNo);
+    else g.orderCount+=item.orderCount;
 
     const a=orderAlloc.get(item);
     if(a){
@@ -315,7 +348,7 @@ async function importSalesReport(raw,fileName,selectedPlatform,manualStart='',ma
   }
 
   for(const g of grouped.values()){
-    if(isShopline)g.orderCount=g._orderNos.size;
+    if(g._orderNos.size)g.orderCount=g._orderNos.size;
     delete g._orderNos;
   }
 
@@ -333,6 +366,33 @@ async function importSalesReport(raw,fileName,selectedPlatform,manualStart='',ma
   });
   const productByRtw=new Map();
   products.forEach(p=>{const k=cleanText(p.rtwBaseSku);if(k)productByRtw.set(k,p)});
+
+  // 建立/更新唯一訂單索引：platform + orderNo 為固定 document ID。
+  // 重複上傳相同訂單只會覆寫同一筆，不會新增第二筆訂單。
+  const uniqueOrders=new Map();
+  for(const item of parsed){
+    if(!item.orderNo)continue;
+    const key=`${selectedPlatform}__${item.orderNo}`;
+    if(!uniqueOrders.has(key))uniqueOrders.set(key,{
+      orderNo:item.orderNo,
+      platform:selectedPlatform,
+      date:item.date,
+      customerPaid:item.customerPaid??0,
+      shipping:item.shipping??0,
+      fileName
+    });
+  }
+  if(uniqueOrders.size){
+    const orderEntries=[...uniqueOrders.entries()];
+    for(let start=0;start<orderEntries.length;start+=300){
+      const ob=writeBatch(db);
+      for(const [key,o] of orderEntries.slice(start,start+300)){
+        const oid=encodeURIComponent(key).replaceAll('%','_');
+        ob.set(doc(db,'orders',oid),{...o,updatedAt:serverTimestamp()},{merge:true});
+      }
+      await ob.commit();
+    }
+  }
 
   let matched=0,unmatched=0;
   const rows=[...grouped.values()];
@@ -411,7 +471,7 @@ async function importExcel(){
     await yieldToUI();
     setImportProgress(`解析工作表：${preferred}`,15);
 
-    const raw=XLSX.utils.sheet_to_json(wb.Sheets[preferred],{defval:'',raw:false});
+    const raw=XLSX.utils.sheet_to_json(wb.Sheets[preferred],{defval:'',raw:false}).map(normalizeImportedNumericFields);
     if(!raw.length)throw new Error('檔案沒有資料');
 
     setImportProgress(`已解析 ${raw.length.toLocaleString()} 列，判斷資料類型…`,20);
