@@ -229,7 +229,7 @@ function normalizeImportedNumericFields(row){
     '價格','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格',
     '日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','日本售價','日本價格','JPY價格',
     '重量(g)','重量',
-    '頁面檢視','頁面檢視總數','售出單位','銷售商品數','銷售數','數量','訂單計數','銷售訂單數',
+    '頁面檢視','頁面檢視總數','非重複訪客','不重複訪客','轉換率','售出單位','銷售商品數','銷售數','數量','訂單計數','銷售訂單數','銷售',
     '顧客已付金額','客戶已付金額','實付金額','付款總金額','運費','已收運費','Shipping',
     '商品結帳價格','商品成交價格','商品售價','店鋪運費','店舖運費'
   ];
@@ -253,13 +253,37 @@ async function importRakutenProductMetrics(raw,fileName,manualStart='',manualEnd
     const sales=n(cleanNumber(findRowValue(row,['銷售','売上','Sales'])));
     const units=n(cleanNumber(findRowValue(row,['售出單位','銷售商品數','銷售數','數量'])));
     const orders=n(cleanNumber(findRowValue(row,['訂單計數','銷售訂單數'])));
+    const pageViews=n(cleanNumber(findRowValue(row,['頁面檢視','頁面檢視總數','アクセス数','PV'])));
+    const visitors=n(cleanNumber(findRowValue(row,['非重複訪客','不重複訪客','Unique Visitors'])));
+    let sourceConversion=cleanNumber(findRowValue(row,['轉換率','Conversion Rate']));
+    // 若來源為 1.23% 之類文字，cleanNumber 會得到 1.23，因此換成 0.0123。
+    // 若來源已是 Excel 百分比數值 0.0123，則直接保留。
+    if(sourceConversion!==null && sourceConversion>1)sourceConversion=sourceConversion/100;
     const sourceDate=findRowValue(row,['訂單日期','日期','Date','資料日期','開始日期','日付']);
     const date=cleanText(sourceDate)?normalizeDateValue(sourceDate):(manualEnd||manualStart||new Date().toISOString().slice(0,10));
     const key=`${date}__${base}`;
-    const g=grouped.get(key)||{date,baseSKU:base,salesAmount:0,unitsSold:0,orderCount:0};
-    g.salesAmount+=sales; g.unitsSold+=units; g.orderCount+=orders;
+    const g=grouped.get(key)||{date,baseSKU:base,salesAmount:0,unitsSold:0,orderCount:0,pageViews:0,visitors:0,conversionRate:null,_conversionWeighted:0,_conversionWeight:0};
+    g.salesAmount+=sales;
+    g.unitsSold+=units;
+    g.orderCount+=orders;
+    g.pageViews+=pageViews;
+    g.visitors+=visitors;
+    if(sourceConversion!==null){
+      const w=pageViews||1;
+      g._conversionWeighted+=sourceConversion*w;
+      g._conversionWeight+=w;
+    }
     grouped.set(key,g);
   }
+  for(const g of grouped.values()){
+    // 優先使用報表原始「轉換率」；若沒有，再用 訂單計數 ÷ 頁面檢視 計算。
+    g.conversionRate=g._conversionWeight
+      ? g._conversionWeighted/g._conversionWeight
+      : (g.pageViews?g.orderCount/g.pageViews:null);
+    delete g._conversionWeighted;
+    delete g._conversionWeight;
+  }
+
   if(!grouped.size)throw new Error('找不到【商品管理編號 (Base SKU)】或商品銷售數據');
 
   const productByBase=new Map();
@@ -285,6 +309,9 @@ async function importRakutenProductMetrics(raw,fileName,manualStart='',manualEnd
             salesAmount:round(r.salesAmount/div),
             unitsSold:round(r.unitsSold/div),
             orderCount:round(r.orderCount/div),
+            pageViews:round(r.pageViews/div),
+            visitors:round(r.visitors/div),
+            conversionRate:r.conversionRate,
             updatedAt:serverTimestamp()
           },{merge:true});
         }
@@ -298,7 +325,8 @@ async function importRakutenProductMetrics(raw,fileName,manualStart='',manualEnd
         // 商品層級銷售額保留獨立欄位；不混入唯一訂單營業額 revenueTWD。
         productSalesTWD:round(r.salesAmount),
         unitsSold:round(r.unitsSold),orderCount:round(r.orderCount),
-        revenueTWD:0,shippingReceivedTWD:0,pageViews:0,
+        pageViews:round(r.pageViews),visitors:round(r.visitors),conversionRate:r.conversionRate,
+        revenueTWD:0,shippingReceivedTWD:0,
         platform:'taiwan_rakuten',dataType:'product_metrics',
         fileName,importedAt:serverTimestamp(),updatedAt:serverTimestamp()
       },{merge:true});
