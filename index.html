@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.23</small>
+        <small>Product Database V1.2.24</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -158,7 +158,7 @@
                 <input id="rakutenWholeShopTrafficFile" type="file" accept=".xlsx,.xls,.csv" multiple>
                 <button id="importRakutenWholeShopTrafficBtn" type="button">匯入全店訪問報告</button>
               </div>
-              <p class="muted">用途：全店流量（PV + UV）。系統先讀取【時間範圍】，再讀取【所有頁面檢視】與【所有非重複訪客】，並保存【全店頁面】【商品頁面】【店家類別頁面】【店家首頁】各自的 PV / UV。注意：你目前提供的報告是「整個時間範圍的彙總值」，不是逐日明細；單一報告只能形成 1 個期間資料點。可一次選取多份不同期間報告，才會形成真正的流量趨勢。</p>
+              <p class="muted">用途：全店流量（PV + UV）。系統先讀取【時間範圍】，再讀取【所有頁面檢視】與【所有非重複訪客】，並保存【全店頁面】【商品頁面】【店家類別頁面】【店家首頁】各自的 PV / UV。支援兩種【時間範圍】格式：① 2026/01/01 ~ 2026/07/31；② 2026/07 ~ 2026/07。若只有年月，系統會自動換算為該月第一天到最後一天，例如 2026/07 ~ 2026/07 → 2026-07-01 ~ 2026-07-31。單一報告仍只形成 1 個期間資料點；可一次選取多份不同期間報告形成流量趨勢。</p>
             </div>
             <div class="import-rule-box">
               <h3>台灣樂天｜商品銷售數據（獨立匯入）</h3>

@@ -964,8 +964,27 @@ function trafficTotalsForRange(start='',end='',platform='all'){
   return reports.reduce((a,t)=>{a.pv+=n(t.totalPV);a.uv+=n(t.totalUV);return a},{pv:0,uv:0});
 }
 function parseTrafficRange(v){
-  const s=cleanText(v);const m=s.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})\s*[~～\-]\s*(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
-  if(!m)return null;const fmt=(y,mo,d)=>`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;return{start:fmt(m[1],m[2],m[3]),end:fmt(m[4],m[5],m[6])};
+  const s=cleanText(v).replace(/\s+/g,' ');
+
+  // 格式 1：YYYY/MM/DD ~ YYYY/MM/DD
+  let m=s.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})\s*[~～\-–—]\s*(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+  if(m){
+    const fmt=(y,mo,d)=>`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    return{start:fmt(m[1],m[2],m[3]),end:fmt(m[4],m[5],m[6]),granularity:'day'};
+  }
+
+  // 格式 2：YYYY/MM ~ YYYY/MM
+  // 月份格式會自動換成該月第一天到結束月份最後一天。
+  m=s.match(/(\d{4})[\/.-](\d{1,2})\s*[~～\-–—]\s*(\d{4})[\/.-](\d{1,2})/);
+  if(m){
+    const sy=Number(m[1]),sm=Number(m[2]),ey=Number(m[3]),em=Number(m[4]);
+    if(sm<1||sm>12||em<1||em>12)return null;
+    const lastDay=new Date(ey,em,0).getDate();
+    const fmt=(y,mo,d)=>`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    return{start:fmt(sy,sm,1),end:fmt(ey,em,lastDay),granularity:'month'};
+  }
+
+  return null;
 }
 async function importRakutenWholeShopTraffic(file){
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheet=wb.Sheets[wb.SheetNames[0]];
@@ -999,7 +1018,7 @@ async function handleRakutenWholeShopTrafficImport(){
       await yieldToUI();
     }
     const pv=results.reduce((s,r)=>s+n(r.totalPV),0),uv=results.reduce((s,r)=>s+n(r.totalUV),0);
-    setImportProgress(`全店流量匯入完成：${results.length} 份報告；PV ${formatInteger(pv)}；UV ${formatInteger(uv)}`,100);
+    setImportProgress(`全店流量匯入完成：${results.length} 份報告；PV ${formatInteger(pv)}；UV ${formatInteger(uv)}；月份格式會自動換算為該月完整日期區間`,100);
     await loadAll();
     toast(`全店訪問報告匯入完成：${results.length} 份`);
   }catch(e){
