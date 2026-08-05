@@ -94,3 +94,6 @@ dialog{border-radius:12px}
 .chart-note{padding:8px 12px 4px;font-size:12px;line-height:1.5}
 
 .pricing-add-row{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:12px 0}.pricing-add-row select{min-width:320px}.pricing-add-row input{width:90px}.pricing-summary{margin-top:16px}
+
+/* v1.2.27 pricing controls */
+.pricing-controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.pricing-controls label{display:grid;gap:6px;font-size:13px;color:var(--muted)}.pricing-controls input[type="number"]{width:120px}.pricing-add-row input[type="text"]{min-width:320px;flex:1}
