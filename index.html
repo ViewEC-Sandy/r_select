@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.18</small>
+        <small>Product Database V1.2.19</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -154,7 +154,7 @@
                 <input id="rakutenProductMetricsFile" type="file" accept=".xlsx,.xls,.csv">
                 <button id="importRakutenProductMetricsBtn" type="button">匯入商品銷售數據</button>
               </div>
-              <p class="muted">依你目前樂天報表表頭讀取：【商品管理編號 (Base SKU)】作為商品對應依據；讀取【銷售】【售出單位】【訂單計數】【頁面檢視】【非重複訪客】【轉換率】。轉換率優先使用報表中的【轉換率】，若該欄為空才使用「訂單計數 ÷ 頁面檢視」自動計算。此報表不需要訂單號碼。日期使用上方「開始日期／結束日期」；相同期間、相同 Base SKU 重複上傳時覆寫原資料，不累加。</p>
+              <p class="muted">依樂天實際表頭讀取：【商品管理編號 (Base SKU)】、【銷售】、【售出單位】、【訂單計數】、【頁面檢視】、【非重複訪客】、【轉換率】。系統會自動偵測真正的表頭列，不限定一定在 Excel 第 1 列；匯入前會直接顯示偵測到的【頁面檢視】欄、有效筆數與總和，避免資料被寫成 0。轉換率優先使用報表原值，空白時才使用「訂單計數 ÷ 頁面檢視」。</p>
             </div>
             <div class="import-rule-box">
               <h3>台灣樂天｜訂單銷售報表讀取方式</h3>

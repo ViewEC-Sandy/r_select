@@ -245,6 +245,43 @@ function normalizeImportedNumericFields(row){
 }
 function findRowValue(row,aliases){const h=findHeader(row,aliases);return h===null?'':row[h]}
 function normalizeDateValue(v){if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);const s=cleanText(v);if(!s)return new Date().toISOString().slice(0,10);const d=new Date(s.replace(/[.\/]/g,'-'));return isNaN(d)?new Date().toISOString().slice(0,10):d.toISOString().slice(0,10)}
+function sheetToObjectsUsingDetectedHeader(sheet,requiredAliases){
+  // 不假設第一列就是表頭。掃描前 50 列，找出包含 Base SKU 與至少一個指定數據欄位的列。
+  const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
+  let headerIndex=-1;
+  for(let i=0;i<Math.min(matrix.length,50);i++){
+    const cells=matrix[i].map(v=>cleanHeader(v));
+    const hasBase=['商品管理編號(BaseSKU)','BaseSKU','商品管理編號'].some(a=>cells.includes(cleanHeader(a)));
+    const hasMetric=requiredAliases.some(a=>cells.includes(cleanHeader(a)));
+    if(hasBase&&hasMetric){headerIndex=i;break}
+  }
+  if(headerIndex<0){
+    // fallback：沿用原本 SheetJS 第一列表頭方式
+    return XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false}).map(normalizeImportedNumericFields);
+  }
+  const headers=matrix[headerIndex].map(v=>cleanText(v));
+  return matrix.slice(headerIndex+1)
+    .filter(row=>row.some(v=>cleanText(v)!==''))
+    .map(row=>{
+      const obj={};
+      headers.forEach((h,i)=>{if(h)obj[h]=row[i]??''});
+      return normalizeImportedNumericFields(obj);
+    });
+}
+
+function parsePercentValue(v){
+  if(v===null||v===undefined||v==='')return null;
+  const s=String(v).trim();
+  const num=cleanNumber(v);
+  if(num===null)return null;
+  // 來源含 % 時，例如 0.98% -> 0.0098。
+  if(/[%％]/.test(s))return num/100;
+  // Excel 百分比常以 0.0098 儲存；若是 0~1 直接視為比例。
+  if(num>=0&&num<=1)return num;
+  // 沒有 %、但值 >1 時視為百分點，例如 1.25 -> 1.25%。
+  return num/100;
+}
+
 async function importRakutenProductMetrics(raw,fileName,manualStart='',manualEnd=''){
   const grouped=new Map();
   for(const row of raw){
@@ -255,10 +292,7 @@ async function importRakutenProductMetrics(raw,fileName,manualStart='',manualEnd
     const orders=n(cleanNumber(findRowValue(row,['訂單計數','銷售訂單數'])));
     const pageViews=n(cleanNumber(findRowValue(row,['頁面檢視','頁面檢視總數','アクセス数','PV'])));
     const visitors=n(cleanNumber(findRowValue(row,['非重複訪客','不重複訪客','Unique Visitors'])));
-    let sourceConversion=cleanNumber(findRowValue(row,['轉換率','Conversion Rate']));
-    // 若來源為 1.23% 之類文字，cleanNumber 會得到 1.23，因此換成 0.0123。
-    // 若來源已是 Excel 百分比數值 0.0123，則直接保留。
-    if(sourceConversion!==null && sourceConversion>1)sourceConversion=sourceConversion/100;
+    const sourceConversion=parsePercentValue(findRowValue(row,['轉換率','Conversion Rate']));
     const sourceDate=findRowValue(row,['訂單日期','日期','Date','資料日期','開始日期','日付']);
     const date=cleanText(sourceDate)?normalizeDateValue(sourceDate):(manualEnd||manualStart||new Date().toISOString().slice(0,10));
     const key=`${date}__${base}`;
@@ -349,10 +383,31 @@ async function handleRakutenProductMetricsImport(){
     setImportProgress('讀取台灣樂天商品銷售數據…',5);
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
     const sheet=wb.Sheets[wb.SheetNames[0]];
-    const raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false}).map(normalizeImportedNumericFields);
+    const raw=sheetToObjectsUsingDetectedHeader(sheet,['銷售','售出單位','訂單計數','頁面檢視','轉換率']);
     if(!raw.length)throw new Error('檔案沒有資料');
+
+    const baseHeader=findHeader(raw[0],['商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU','商品管理編號']);
+    const pvHeader=findHeader(raw[0],['頁面檢視','頁面檢視總數','アクセス数','PV']);
+    const convHeader=findHeader(raw[0],['轉換率','Conversion Rate']);
+    const unitsHeader=findHeader(raw[0],['售出單位','銷售商品數','銷售數','數量']);
+    const ordersHeader=findHeader(raw[0],['訂單計數','銷售訂單數']);
+
+    if(!baseHeader)throw new Error('找不到【商品管理編號 (Base SKU)】表頭');
+    if(!pvHeader)throw new Error(`找不到【頁面檢視】表頭。實際表頭：${Object.keys(raw[0]).join(' / ')}`);
+
+    const pvValues=raw.map(r=>cleanNumber(r[pvHeader])).filter(v=>v!==null);
+    const pvTotal=pvValues.reduce((s,v)=>s+n(v),0);
+    const unitTotal=unitsHeader?raw.reduce((s,r)=>s+n(cleanNumber(r[unitsHeader])),0):0;
+    const orderTotal=ordersHeader?raw.reduce((s,r)=>s+n(cleanNumber(r[ordersHeader])),0):0;
+
     const start=$('salesImportStart')?.value||'', end=$('salesImportEnd')?.value||'';
-    setImportProgress(`已讀取 ${raw.length.toLocaleString()} 列，依 Base SKU 寫入…`,35);
+    setImportProgress(
+      `偵測表頭：頁面檢視=${pvHeader}；有效 ${pvValues.length.toLocaleString()} 筆／總和 ${formatInteger(pvTotal)}；售出單位總和 ${formatInteger(unitTotal)}；訂單計數總和 ${formatInteger(orderTotal)}${convHeader?`；轉換率=${convHeader}`:'；未找到轉換率欄'}`,
+      30
+    );
+    await yieldToUI();
+    if(pvValues.length===0)throw new Error(`已找到【${pvHeader}】欄，但沒有任何可轉換為數值的內容。請確認來源檔該欄不是空白。`);
+
     const result=await importRakutenProductMetrics(raw,file.name,start,end);
     setImportProgress(`商品銷售數據匯入完成：對應 ${result.matched.toLocaleString()} 筆，未對應 ${result.unmatched.toLocaleString()} 筆`,100);
     await loadAll();
