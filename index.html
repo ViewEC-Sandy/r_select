@@ -24,11 +24,12 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.25</small>
+        <small>Product Database V1.2.26</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
         <button id="productTabBtn" type="button" class="side-nav-item active">商品資料庫</button>
+        <button id="pricingTabBtn" type="button" class="side-nav-item">定價試算</button>
         <button id="salesTabBtn" type="button" class="side-nav-item">銷售狀態</button>
         <button id="crossPlatformTabBtn" type="button" class="side-nav-item">商品跨平台</button>
         <button id="platformCompareTabBtn" type="button" class="side-nav-item">平台比較</button>
@@ -121,6 +122,18 @@
         <section class="card ranking-card">
           <div class="section-head"><h3>商品銷售排行榜</h3><div><select id="rankingSort"><option value="units_desc">銷售數量：大到小</option><option value="units_asc">銷售數量：小到大</option><option value="revenue_desc">營業額：大到小</option><option value="revenue_asc">營業額：小到大</option><option value="orders_desc">訂單數：大到小</option><option value="price_desc">單價：大到小</option></select> <span id="rankingPeriod" class="muted"></span></div></div>
           <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
+        </section>
+      </section>
+      <section id="pricingView" class="hidden overview-page">
+        <section class="card">
+          <div class="section-head"><div><h2>單件商品重新定價</h2><p class="muted">不修改商品主檔。以「客人只買 1 件」為基準，計算達到目標利潤率所需售價。</p></div><input id="pricingSearch" type="search" placeholder="搜尋商品編號或名稱"></div>
+          <div class="table-wrap"><table><thead><tr><th>商品規格管理編號</th><th>商品標題</th><th>日幣售價</th><th>重量(g)</th><th>物流</th><th>單件物流成本</th><th>客收運費</th><th>目前售價</th><th>30%建議售價</th><th>調整</th></tr></thead><tbody id="pricingTableBody"></tbody></table></div>
+        </section>
+        <section class="card">
+          <div class="section-head"><div><h2>多件訂單組合試算</h2><p class="muted">商品售價不重新計算；將所有商品重量合計後，只計算一次實際物流，檢查整張訂單利潤率。</p></div></div>
+          <div class="pricing-add-row"><select id="pricingProductSelect"></select><input id="pricingQty" type="number" min="1" step="1" value="1"><button id="pricingAddBtn" type="button">加入試算</button><button id="pricingClearBtn" type="button" class="secondary">清空</button></div>
+          <div class="table-wrap"><table><thead><tr><th>商品</th><th>單價(TWD)</th><th>重量(g)</th><th>數量</th><th>小計</th><th></th></tr></thead><tbody id="pricingCartBody"></tbody></table></div>
+          <div id="pricingSummary" class="pricing-summary muted">請先加入商品。</div>
         </section>
       </section>
       <section id="crossPlatformView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>商品跨平台</h2><div class="period-filter"><label>開始日期<input id="crossStart" type="date"></label><label>結束日期<input id="crossEnd" type="date"></label><label>平台<select id="crossPlatformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>已收運費</span><strong id="crossShipping">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead id="crossPlatformHead"></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>

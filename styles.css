@@ -92,3 +92,5 @@ dialog{border-radius:12px}
 .overview-data-status{padding:6px 2px 2px;font-size:12px}
 
 .chart-note{padding:8px 12px 4px;font-size:12px;line-height:1.5}
+
+.pricing-add-row{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:12px 0}.pricing-add-row select{min-width:320px}.pricing-add-row input{width:90px}.pricing-summary{margin-top:16px}
