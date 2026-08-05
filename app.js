@@ -179,7 +179,7 @@ function matchesColumnFilter(p,key,filter){
   return!filter.text||String(value??'').toLowerCase().includes(String(filter.text).toLowerCase());
 }
 function compareValues(a,b,key){const type=FIELD_MAP[key]?.type,av=a[key],bv=b[key];if(type==='number'||type==='percent')return(n(av)-n(bv));if(type==='boolean')return Number(!!av)-Number(!!bv);return String(av??'').localeCompare(String(bv??''),'zh-Hant',{numeric:true,sensitivity:'base'})}
-function salesRowsInRange(){const start=$('salesFilterStart')?.value||'',end=$('salesFilterEnd')?.value||'';return salesHistory.filter(r=>dateInRange(r.date,start,end))}
+function salesRowsInRange(){const start=$('salesFilterStart')?.value||'',end=$('salesFilterEnd')?.value||'';return salesHistory.filter(r=>dateInRange(r.date||r.periodEnd||r.periodStart,start,end))}
 function aggregateSalesProducts(){
   const result=new Map(products.map(p=>[p.id,{...p,pageViews:0,unitsSold:0,orderCount:0,salesRevenueTWD:0,shippingReceivedTWD:0,conversionRate:null}]));
   for(const r of salesRowsInRange()){
@@ -199,7 +199,17 @@ function filtered(){
   if(sortState.key)list.sort((a,b)=>compareValues(a,b,sortState.key)*(sortState.direction==='asc'?1:-1));
   return list;
 }
-function renderAll(){renderTable();const list=filtered();$('statProducts').textContent=formatInteger(list.length);$('statActive').textContent=formatInteger(list.filter(p=>p.active).length);const margins=list.map(p=>p.profitRate).filter(Number.isFinite);$('statMargin').textContent=margins.length?(margins.reduce((a,b)=>a+b,0)/margins.length*100).toFixed(1)+'%':'0%';$('statUnits').textContent=formatInteger(list.reduce((s,p)=>s+n(p.unitsSold),0));if($('statRevenue'))$('statRevenue').textContent=formatInteger(list.reduce((s,p)=>s+n(p.salesRevenueTWD),0));if($('statShipping'))$('statShipping').textContent=formatInteger(list.reduce((s,p)=>s+n(p.shippingReceivedTWD),0));if($('statRevenueCard'))$('statRevenueCard').classList.toggle('hidden',currentView!=='sales');if($('statShippingCard'))$('statShippingCard').classList.toggle('hidden',currentView!=='sales');if($('salesDateFilters'))$('salesDateFilters').classList.toggle('hidden',currentView!=='sales');updateSelectionCount()}
+function renderAll(){renderTable();const list=filtered();$('statProducts').textContent=formatInteger(list.length);$('statActive').textContent=formatInteger(list.filter(p=>p.active).length);const margins=list.map(p=>p.profitRate).filter(Number.isFinite);$('statMargin').textContent=margins.length?(margins.reduce((a,b)=>a+b,0)/margins.length*100).toFixed(1)+'%':'0%';$('statUnits').textContent=formatInteger(list.reduce((s,p)=>s+n(p.unitsSold),0));if($('statRevenue')){
+  if(currentView==='sales'){
+    const s=$('salesFilterStart')?.value||'',e=$('salesFilterEnd')?.value||'';
+    const totals=orderTotalsForRange(s,e,'all');
+    $('statRevenue').textContent=formatInteger(totals.revenue);
+    if($('statShipping'))$('statShipping').textContent=formatInteger(totals.shipping);
+  }else{
+    $('statRevenue').textContent=formatInteger(list.reduce((sum,p)=>sum+n(p.salesRevenueTWD),0));
+    if($('statShipping'))$('statShipping').textContent=formatInteger(list.reduce((sum,p)=>sum+n(p.shippingReceivedTWD),0));
+  }
+}if($('statRevenueCard'))$('statRevenueCard').classList.toggle('hidden',currentView!=='sales');if($('statShippingCard'))$('statShippingCard').classList.toggle('hidden',currentView!=='sales');if($('salesDateFilters'))$('salesDateFilters').classList.toggle('hidden',currentView!=='sales');updateSelectionCount()}
 function getUniqueFilterValues(key){const map=new Map();currentProductList().forEach(p=>{const raw=p[key],k=filterValueKey(key,raw);if(!map.has(k))map.set(k,raw)});return[...map.entries()].sort((a,b)=>compareValues({[key]:a[1]},{[key]:b[1]},key)).slice(0,500)}
 function renderTable(){
   const list=filtered(),pages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));page=Math.min(page,pages);
@@ -951,7 +961,23 @@ function ordersForRange(start='',end='',platform='all'){
 }
 function orderTotalsForRange(start='',end='',platform='all'){
   const rows=ordersForRange(start,end,platform);
-  if(rows.length)return{revenue:round(rows.reduce((s,o)=>s+n(o.customerPaid),0)),shipping:round(rows.reduce((s,o)=>s+n(o.shipping),0)),orderCount:rows.length,hasOrders:true};
+  if(rows.length){
+    // 舊資料或重複匯入也再次以「平台 + 訂單號碼」去重，避免總營業額重複計算。
+    const unique=new Map();
+    for(const o of rows){
+      const orderNo=cleanText(o.orderNo||o.orderNumber||o.orderId||o.id);
+      if(!orderNo)continue;
+      const key=`${cleanText(o.platform)}__${orderNo}`;
+      if(!unique.has(key))unique.set(key,o);
+    }
+    const vals=[...unique.values()];
+    return{
+      revenue:round(vals.reduce((s,o)=>s+n(o.customerPaid),0)),
+      shipping:round(vals.reduce((s,o)=>s+n(o.shipping),0)),
+      orderCount:vals.length,
+      hasOrders:true
+    };
+  }
   const sales=salesHistory.filter(r=>dateInRange(r.date||r.periodEnd||r.periodStart,start,end)&&(platform==='all'||r.platform===platform));
   return uniqueOrderTotals(sales);
 }
