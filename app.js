@@ -34,7 +34,7 @@ const PLATFORMS=[{id:'taiwan_rakuten',name:'台灣樂天'},{id:'rianyou_shopify'
 const MAINT_COLLECTIONS={products:'商品主檔',sales:'銷售',orders:'唯一訂單',trafficReports:'全店訪問報告',imports:'匯入紀錄',platforms:'平台資料',stores:'店鋪資料'};
 const DEFAULT_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','japanUrl','active','priceJPY','domesticShippingJPY','domesticShippingTWD','weightG','manualPriceTWD','profitTWD','profitRate'];
 const SALES_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','japanUrl','active','pageViews','unitsSold','orderCount','salesRevenueTWD','shippingReceivedTWD','conversionRate','manualPriceTWD','profitTWD','profitRate'];
-let products=[], stores=[], salesHistory=[], storeMap=new Map(), params={...DEFAULT_PARAMS}, visibleColumns=JSON.parse(localStorage.getItem('visibleColumns')||'null')||DEFAULT_COLUMNS, salesVisibleColumns=JSON.parse(localStorage.getItem('salesVisibleColumns')||'null')||SALES_COLUMNS, page=1; const PAGE_SIZE=50;
+let products=[], stores=[], salesHistory=[], ordersHistory=[], trafficHistory=[], storeMap=new Map(), params={...DEFAULT_PARAMS}, visibleColumns=JSON.parse(localStorage.getItem('visibleColumns')||'null')||DEFAULT_COLUMNS, salesVisibleColumns=JSON.parse(localStorage.getItem('salesVisibleColumns')||'null')||SALES_COLUMNS, page=1; const PAGE_SIZE=50;
 let currentView='products', selectedProductIds=new Set(), discountResults=[], salesTrendChart=null, rankingChart=null, trafficTrendChart=null, platformRevenueChart=null;
 let crossSort={key:'revenue',direction:'desc'}, platformSort={key:'revenue',direction:'desc'};
 const CROSS_COLUMN_DEFS=[['spec','商品規格管理編號'],['base','商品管理編號'],['title','商品名'],['platform','平台'],['revenue','營業額'],['shipping','已收運費'],['units','銷量'],['orders','訂單數']];
@@ -137,7 +137,32 @@ function formatInteger(v){const value=Number(v);return Number.isFinite(value)?Ma
 function format(k,v){const t=FIELD_MAP[k]?.type;if(v===null||v===undefined||v==='')return '';if(k==='title'){const full=cleanText(v),shown=full.length>20?full.slice(0,20)+'…':full;return `<span class="title-cell" title="${esc(full)}">${esc(shown)}</span>`;}if(k==='storeCode'){const code=cleanText(v).toUpperCase(),url=validUrl(storeMap.get(code)?.url);return url?`<a class="url-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(code)} ↗</a>`:esc(code)}if(t==='url'){const url=validUrl(v);return url?`<a class="url-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">開啟 ↗</a>`:''}if(t==='percent')return(n(v)*100).toFixed(1)+'%';if(t==='number')return formatInteger(v);if(t==='boolean')return v?'<span class="badge">上架</span>':'<span class="badge off">下架</span>';return esc(v)}
 async function ensurePlatforms(){for(const x of PLATFORMS)await setDoc(doc(db,'platforms',x.id),{name:x.name,active:true,updatedAt:serverTimestamp()},{merge:true})}
 async function loadStores(){const snap=await getDocs(collection(db,'stores'));stores=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.code).localeCompare(String(b.code),undefined,{numeric:true}));storeMap=new Map(stores.map(s=>[String(s.code||s.id).toUpperCase(),s]))}
-async function loadAll(){await ensurePlatforms();const setting=await getDoc(doc(db,'settings','params'));params=setting.exists()?{...DEFAULT_PARAMS,...setting.data()}:structuredClone(DEFAULT_PARAMS);await loadStores();const snap=await getDocs(collection(db,'products'));products=snap.docs.map(d=>({id:d.id,...d.data()})).map(compute);const salesSnap=await getDocs(collection(db,'sales'));salesHistory=salesSnap.docs.map(d=>({id:d.id,...d.data()}));const orderSnap=await getDocs(collection(db,'orders'));ordersHistory=orderSnap.docs.map(d=>({id:d.id,...d.data()}));const trafficSnap=await getDocs(collection(db,'trafficReports'));trafficHistory=trafficSnap.docs.map(d=>({id:d.id,...d.data()}));renderAll();renderParams();if(currentView==='overview')renderOverview();else if(currentView==='platformCompare')renderPlatformCompare();else if(currentView==='crossPlatform')renderCrossPlatform()}
+async function safeCollectionDocs(name){
+  try{
+    const snap=await getDocs(collection(db,name));
+    return snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){
+    console.error(`讀取 ${name} 失敗`,e);
+    return [];
+  }
+}
+async function loadAll(){
+  try{await ensurePlatforms()}catch(e){console.error('ensurePlatforms failed',e)}
+  try{
+    const setting=await getDoc(doc(db,'settings','params'));
+    params=setting.exists()?{...DEFAULT_PARAMS,...setting.data()}:structuredClone(DEFAULT_PARAMS);
+  }catch(e){console.error('params load failed',e);params=structuredClone(DEFAULT_PARAMS)}
+  try{await loadStores()}catch(e){console.error('stores load failed',e);stores=[];storeMap=new Map()}
+  products=(await safeCollectionDocs('products')).map(compute);
+  salesHistory=await safeCollectionDocs('sales');
+  ordersHistory=await safeCollectionDocs('orders');
+  trafficHistory=await safeCollectionDocs('trafficReports');
+  renderAll();
+  renderParams();
+  if(currentView==='overview')renderOverview();
+  else if(currentView==='platformCompare')renderPlatformCompare();
+  else if(currentView==='crossPlatform')renderCrossPlatform();
+}
 function filterValueKey(key,value){const type=FIELD_MAP[key]?.type;if(value===null||value===undefined||value==='')return'__BLANK__';if(type==='boolean')return value?'true':'false';return String(value)}
 function filterValueLabel(key,value){const type=FIELD_MAP[key]?.type;if(value===null||value===undefined||value==='')return'(空白)';if(type==='boolean')return value?'上架':'下架';if(type==='percent')return(n(value)*100).toFixed(1)+'%';if(type==='number')return formatInteger(value);return String(value)}
 function matchesColumnFilter(p,key,filter){
@@ -212,7 +237,12 @@ function exportDiscountResults(){if(!discountResults.length)return toast('目前
 
 function renderColumns(){if(currentView==='crossPlatform'){$('columnOptions').innerHTML=CROSS_COLUMN_DEFS.map(([k,l])=>`<label><input type="checkbox" value="${k}" ${crossVisibleColumns.includes(k)?'checked':''}>${esc(l)}</label>`).join('');return}const current=currentView==='sales'?salesVisibleColumns:visibleColumns;const allowed=currentView==='sales'?FIELDS.filter(([k])=>SALES_COLUMNS.includes(k)):FIELDS;$('columnOptions').innerHTML=allowed.map(([k,l])=>`<label><input type="checkbox" value="${k}" ${current.includes(k)?'checked':''}>${esc(l)}</label>`).join('')}
 function renderProductForm(p={}){const computed=compute(p);$('productId').value=p.id||'';$('productDialogTitle').textContent=p.id?'編輯商品':'新增商品';const pd=p.platformData||{};const platformHtml=`<div class="platform-editor full-span"><h3>平台資料</h3>${PLATFORMS.map(x=>`<fieldset><legend>${x.name}</legend><label><input type="checkbox" name="platform_${x.id}_enabled" ${pd[x.id]?.enabled?'checked':''}> 啟用此平台</label><label>售價<input type="number" step="any" name="platform_${x.id}_price" value="${esc(pd[x.id]?.price??'')}"></label><label>上架<select name="platform_${x.id}_active"><option value="true" ${pd[x.id]?.active!==false?'selected':''}>上架</option><option value="false" ${pd[x.id]?.active===false?'selected':''}>下架</option></select></label><label>備註<textarea name="platform_${x.id}_note">${esc(pd[x.id]?.note??'')}</textarea></label></fieldset>`).join('')}</div>`;$('productFields').innerHTML=platformHtml+FIELDS.filter(([k])=>!['conversionRate','storeCode','storeName','domesticShippingJPY'].includes(k)).map(([k,l,t,mode])=>{const v=computed[k]??'';if(k==='active')return`<label>${l}<select name="${k}"><option value="true" ${v!==false?'selected':''}>上架</option><option value="false" ${v===false?'selected':''}>下架</option></select></label>`;if(t==='textarea')return`<label>${l}<textarea name="${k}">${esc(v)}</textarea></label>`;const readonly=mode==='calculated'&&k==='logisticsMethod';const inputType=t==='number'||t==='percent'?'number':t==='url'?'url':'text';const step=t==='percent'?'0.0001':'any';const input=`<input name="${k}" type="${inputType}" step="${step}" value="${esc(v)}" ${readonly?'readonly':''}>`;if(mode==='calculated'&&!readonly)return`<label>${l}<span class="override-row">${input}<button type="button" class="secondary reset-override" data-reset="${k}">自動</button></span></label>`;return`<label>${l}${input}</label>`}).join('')}
-function renderParams(){$('paramsFields').innerHTML=PARAM_DEFS.map(([k,l])=>`<label>${l}<input name="${k}" type="number" step="any" value="${params[k]}"></label>`).join('');$('shippingTierBody').innerHTML=params.tiers.map((t,i)=>`<tr><td><input name="tierMax_${i}" type="number" step="any" value="${t[0]}"></td><td><input name="tierFee_${i}" type="number" step="any" value="${t[1]}"></td></tr>`).join('')}
+function renderParams(){
+  params={...DEFAULT_PARAMS,...(params||{})};
+  if(!Array.isArray(params.tiers)||!params.tiers.length)params.tiers=structuredClone(DEFAULT_PARAMS.tiers);
+  if($('paramsFields'))$('paramsFields').innerHTML=PARAM_DEFS.map(([k,l])=>`<label>${l}<input name="${k}" type="number" step="any" value="${params[k]??DEFAULT_PARAMS[k]??''}"></label>`).join('');
+  if($('shippingTierBody'))$('shippingTierBody').innerHTML=params.tiers.map((t,i)=>`<tr><td><input name="tierMax_${i}" type="number" step="any" value="${t[0]}"></td><td><input name="tierFee_${i}" type="number" step="any" value="${t[1]}"></td></tr>`).join('');
+}
 async function saveProduct(form){const fd=new FormData(form),id=$('productId').value,old=id?products.find(p=>p.id===id):{};const data={...old,overrides:{...(old?.overrides||{})}};FIELDS.forEach(([k,,t,mode])=>{if(['conversionRate','storeCode','storeName','domesticShippingJPY'].includes(k))return;const raw=fd.get(k);if(raw===null)return;data[k]=t==='number'||t==='percent'?(raw===''?null:Number(raw)):t==='boolean'?raw==='true':String(raw);if(mode==='calculated'&&k!=='logisticsMethod'&&raw!=='')data.overrides[k]=true});data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);data.platformData={};PLATFORMS.forEach(x=>{data.platformData[x.id]={enabled:fd.get(`platform_${x.id}_enabled`)==='on',price:fd.get(`platform_${x.id}_price`)===''?null:Number(fd.get(`platform_${x.id}_price`)),active:fd.get(`platform_${x.id}_active`)==='true',note:String(fd.get(`platform_${x.id}_note`)||'')}});data.title=String(data.title||'').slice(0,100);data.updatedAt=serverTimestamp();if(!id)data.createdAt=serverTimestamp();const ref=id?doc(db,'products',id):doc(collection(db,'products'));await setDoc(ref,data,{merge:true});toast('商品已儲存');$('productDialog').close();await loadAll()}
 function findHeader(row,aliases){const normalized=Object.fromEntries(Object.keys(row).map(k=>[cleanHeader(k),k]));for(const a of aliases){const hit=normalized[cleanHeader(a)];if(hit!==undefined)return hit}return null}
 function normalizeImportRows(rows){let parent={productManagementId:'',title:'',note:'',taiwanUrl:'',japanUrl:'',rtwBaseSku:''};return rows.map(row=>{const data={};for(const [key,aliases] of Object.entries(IMPORT_ALIASES)){const h=findHeader(row,aliases);if(h!==null)data[key]=row[h]}for(const k of Object.keys(data))data[k]=typeof data[k]==='string'?cleanText(data[k]):data[k];for(const k of ['productManagementId','title','note','taiwanUrl','japanUrl','rtwBaseSku']){if(cleanText(data[k]))parent[k]=data[k];else data[k]=parent[k]}data.specManagementId=cleanText(data.specManagementId);data.productManagementId=cleanText(data.productManagementId);data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);return data}).filter(r=>r.specManagementId)}
@@ -898,18 +928,36 @@ function openStoreForm(store={}){$('storeId').value=store.id||'';$('storeCode').
 async function saveStore(form){const fd=new FormData(form),id=$('storeId').value,code=cleanText(fd.get('code')).toUpperCase();if(!/^R\d{1,4}$/i.test(code))return toast('店鋪編號格式需為 R 加數字，例如 R60');const data={code,name:cleanText(fd.get('name')),url:validUrl(fd.get('url')),shippingJPY:n(fd.get('shippingJPY'))||params.domesticShippingJPY,updatedAt:serverTimestamp()};if(!id)data.createdAt=serverTimestamp();await setDoc(doc(db,'stores',id||code),data,{merge:true});$('storeEditDialog').close();await loadAll();renderStores();toast('店鋪已儲存')}
 async function importStores(){const file=$('storeExcelFile').files[0];if(!file)return toast('請先選擇店鋪 Excel');$('storeImportStatus').textContent='讀取中…';try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),merged=new Map();for(const sheetName of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{defval:'',raw:false});for(const row of rows){const code=cleanText(row['樂天編號']||row['店鋪編號']||row['店舖編號']||row['編號']).toUpperCase();if(!code)continue;const old=merged.get(code)||{};merged.set(code,{code,name:cleanText(row['店家名']||row['店鋪名']||row['店鋪名稱']||old.name),url:validUrl(row['網址']||row['店鋪網址']||old.url),shippingJPY:cleanNumber(row['運費'])??old.shippingJPY??params.domesticShippingJPY})}}if(!merged.size)throw new Error('找不到「樂天編號」欄位');const list=[...merged.values()];for(let i=0;i<list.length;i+=400){const batch=writeBatch(db);list.slice(i,i+400).forEach(s=>batch.set(doc(db,'stores',s.code),{...s,updatedAt:serverTimestamp()},{merge:true}));await batch.commit()}await addDoc(collection(db,'imports'),{type:'stores',fileName:file.name,rowCount:list.length,successCount:list.length,createdAt:serverTimestamp()});$('storeImportStatus').textContent=`完成：${list.length} 間店鋪`;await loadAll();renderStores();toast('店鋪總表匯入完成')}catch(e){console.error(e);$('storeImportStatus').textContent='匯入失敗：'+e.message}}
 async function resyncProducts(){await loadAll();renderStores();toast(`已依 ${stores.length} 間店鋪重新計算 ${products.length} 筆商品`)}
-function dateInRange(date,start,end){const d=cleanText(date);return(!start||d>=start)&&(!end||d<=end)}
+function normalizeFilterDate(v){
+  const s=cleanText(v);
+  if(!s)return '';
+  const m=s.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+  if(m)return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  return s.slice(0,10);
+}
+function dateInRange(date,start,end){
+  const d=normalizeFilterDate(date),s=normalizeFilterDate(start),e=normalizeFilterDate(end);
+  if(!d)return false;
+  return(!s||d>=s)&&(!e||d<=e);
+}
+function periodsOverlap(periodStart,periodEnd,start,end){
+  const ps=normalizeFilterDate(periodStart),pe=normalizeFilterDate(periodEnd),s=normalizeFilterDate(start),e=normalizeFilterDate(end);
+  if(!ps&&!pe)return false;
+  const a=ps||pe,b=pe||ps;
+  return(!s||b>=s)&&(!e||a<=e);
+}
 function ordersForRange(start='',end='',platform='all'){
-  return ordersHistory.filter(o=>dateInRange(o.date,start,end)&&(platform==='all'||o.platform===platform));
+  return ordersHistory.filter(o=>dateInRange(o.date||o.periodEnd||o.periodStart,start,end)&&(platform==='all'||o.platform===platform));
 }
 function orderTotalsForRange(start='',end='',platform='all'){
   const rows=ordersForRange(start,end,platform);
   if(rows.length)return{revenue:round(rows.reduce((s,o)=>s+n(o.customerPaid),0)),shipping:round(rows.reduce((s,o)=>s+n(o.shipping),0)),orderCount:rows.length,hasOrders:true};
-  const sales=salesHistory.filter(r=>dateInRange(r.date,start,end)&&(platform==='all'||r.platform===platform));
+  const sales=salesHistory.filter(r=>dateInRange(r.date||r.periodEnd||r.periodStart,start,end)&&(platform==='all'||r.platform===platform));
   return uniqueOrderTotals(sales);
 }
 function trafficReportsForRange(start='',end='',platform='all'){
-  return trafficHistory.filter(t=>(platform==='all'||t.platform===platform)&&(!start||cleanText(t.periodStart)>=start)&&(!end||cleanText(t.periodEnd)<=end));
+  // 全店訪問報告是「期間彙總」而非逐日資料，只要報告期間與篩選期間有交集就納入。
+  return trafficHistory.filter(t=>(platform==='all'||t.platform===platform)&&periodsOverlap(t.periodStart,t.periodEnd,start,end));
 }
 function trafficTotalsForRange(start='',end='',platform='all'){
   const reports=trafficReportsForRange(start,end,platform);
@@ -941,12 +989,23 @@ async function handleRakutenWholeShopTrafficImport(){
   try{setImportProgress('讀取台灣樂天全店訪問報告…',10);const r=await importRakutenWholeShopTraffic(file);setImportProgress(`全店流量匯入完成：${r.start} ～ ${r.end}；PV ${formatInteger(r.totalPV)}；UV ${formatInteger(r.totalUV)}`,100);await loadAll();toast('全店訪問報告匯入完成')}catch(e){console.error(e);setImportProgress(`匯入失敗：${e.message||e}`,100)}finally{if(btn)btn.disabled=false}
 }
 
-function getOverviewRows(){const start=$('overviewStart').value,end=$('overviewEnd').value,platform=$('overviewPlatform').value;return salesHistory.filter(r=>dateInRange(r.date,start,end)&&(platform==='all'||r.platform===platform))}
+function getOverviewRows(){const start=$('overviewStart').value,end=$('overviewEnd').value,platform=$('overviewPlatform').value;return salesHistory.filter(r=>dateInRange(r.date||r.periodEnd||r.periodStart,start,end)&&(platform==='all'||r.platform===platform))}
 function productForSalesRow(r){return products.find(p=>cleanText(p.productManagementId)===cleanText(r.baseSKU))||products.find(p=>cleanText(p.specManagementId)===cleanText(r.specManagementId))}
 function shortTitle(v){const s=cleanText(v);return s.length>20?s.slice(0,20)+'…':s}
 function salesRowRevenue(r){if(Number.isFinite(Number(r.revenueTWD))&&n(r.revenueTWD)!==0)return n(r.revenueTWD);const p=productForSalesRow(r);return n(r.unitsSold)*n(p?.manualPriceTWD)}
 function uniqueOrderTotals(rows){const seen=new Set();let revenue=0,shipping=0;for(const r of rows){for(const o of (Array.isArray(r.orderDetails)?r.orderDetails:[])){const key=`${r.platform||''}__${o.orderNo}`;if(!o.orderNo||seen.has(key))continue;seen.add(key);revenue+=n(o.customerPaid);shipping+=n(o.shipping)}}const hasOrders=seen.size>0;if(!hasOrders){revenue=rows.reduce((s,r)=>s+salesRowRevenue(r),0);shipping=rows.reduce((s,r)=>s+n(r.shippingReceivedTWD),0)}return{revenue,shipping,orderCount:seen.size,hasOrders}}
 function sortRanking(rows){const mode=$('rankingSort')?.value||'units_desc';return rows.sort((a,b)=>{if(mode==='units_asc')return a.units-b.units;if(mode==='revenue_desc')return b.revenue-a.revenue;if(mode==='revenue_asc')return a.revenue-b.revenue;if(mode==='orders_desc')return b.orders-a.orders;if(mode==='price_desc')return b.price-a.price;return b.units-a.units||b.orders-a.orders})}
+function safeChart(canvasId,oldChart,config){
+  try{
+    if(oldChart)oldChart.destroy();
+    const el=$(canvasId);
+    if(!el)return null;
+    return new Chart(el,config);
+  }catch(e){
+    console.error(`Chart ${canvasId} render failed`,e);
+    return null;
+  }
+}
 function renderOverview(){
   if(currentView!=='overview')return;
   const startDate=$('overviewStart').value,endDate=$('overviewEnd').value,platform=$('overviewPlatform').value;
@@ -955,7 +1014,7 @@ function renderOverview(){
   const fallbackOrders=rows.reduce((s,r)=>s+n(r.orderCount),0);
   const totals=orderTotalsForRange(startDate,endDate,platform);
   const orders=totals.hasOrders?totals.orderCount:fallbackOrders,revenue=totals.revenue;
-  const traffic=trafficTotalsForRange(startDate,endDate,platform),pv=traffic.pv,uv=traffic.uv;
+  const traffic=trafficTotalsForRange(startDate,endDate,platform),pv=traffic.pv,uv=traffic.uv;if($('overviewDataStatus'))$('overviewDataStatus').textContent=`已載入：商品 ${products.length.toLocaleString()}／銷售紀錄 ${salesHistory.length.toLocaleString()}／唯一訂單 ${ordersHistory.length.toLocaleString()}／全店訪問報告 ${trafficHistory.length.toLocaleString()}`;
   $('ovUniqueVisitors').textContent=formatInteger(uv);
   $('ovUnitsSold').textContent=formatInteger(units);
   $('ovOrders').textContent=formatInteger(orders);
@@ -989,7 +1048,7 @@ function renderOverview(){
   else{for(const r of rows){if(r.dataType==='product_metrics')continue;const d=salesByDate.get(r.date)||{revenue:0,orders:0};d.revenue+=n(r.revenueTWD);d.orders+=n(r.orderCount);salesByDate.set(r.date,d)}}
   const dates=[...salesByDate.keys()].sort();
   if(salesTrendChart)salesTrendChart.destroy();
-  salesTrendChart=new Chart($('salesTrendChart'),{data:{labels:dates,datasets:[{type:'bar',label:'營業額',data:dates.map(d=>salesByDate.get(d).revenue),yAxisID:'y'},{type:'line',label:'銷售訂單數',data:dates.map(d=>salesByDate.get(d).orders),yAxisID:'y1',tension:.2}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,position:'left'},y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false}}}}});
+  salesTrendChart=safeChart('salesTrendChart',salesTrendChart,{type:'bar',data:{labels:dates,datasets:[{type:'bar',label:'營業額',data:dates.map(d=>salesByDate.get(d).revenue),yAxisID:'y'},{type:'line',label:'銷售訂單數',data:dates.map(d=>salesByDate.get(d).orders),yAxisID:'y1',tension:.2}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,position:'left'},y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false}}}}});
 
   const top=[...ranking].sort((a,b)=>b.units-a.units).slice(0,10).reverse();if(rankingChart)rankingChart.destroy();rankingChart=new Chart($('rankingChart'),{type:'bar',data:{labels:top.map(r=>shortTitle(r.title||r.baseSKU)),datasets:[{label:'銷售數量',data:top.map(r=>r.units)}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}});
 
@@ -1001,7 +1060,7 @@ function renderOverview(){
 
   if(platformRevenueChart)platformRevenueChart.destroy();const pLabels=[...byPlatform.keys()].map(x=>PLATFORMS.find(p=>p.id===x)?.name||x);platformRevenueChart=new Chart($('platformRevenueChart'),{type:'doughnut',data:{labels:pLabels,datasets:[{data:[...byPlatform.values()]}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%'}});
 }
-function rowsForSection(startId,endId,platformId){const start=$(startId)?.value||'',end=$(endId)?.value||'',platform=$(platformId)?.value||'all';return salesHistory.filter(r=>dateInRange(r.date,start,end)&&(platform==='all'||r.platform===platform))}
+function rowsForSection(startId,endId,platformId){const start=$(startId)?.value||'',end=$(endId)?.value||'',platform=$(platformId)?.value||'all';return salesHistory.filter(r=>dateInRange(r.date||r.periodEnd||r.periodStart,start,end)&&(platform==='all'||r.platform===platform))}
 function sortDataRows(list,state){return list.sort((a,b)=>{const av=a[state.key],bv=b[state.key];const numeric=['revenue','shipping','units','orders','pv','uv','conversion'].includes(state.key);const cmp=numeric?n(av)-n(bv):String(av??'').localeCompare(String(bv??''),'zh-Hant',{numeric:true});return cmp*(state.direction==='asc'?1:-1)})}
 function sortHeader(label,key,scope,state){return `<div class="excel-header"><span>${esc(label)}</span><select class="mini-sort" data-${scope}-sort="${key}" aria-label="${esc(label)}排序"><option value="">排序</option><option value="asc" ${state.key===key&&state.direction==='asc'?'selected':''}>▲ 小→大</option><option value="desc" ${state.key===key&&state.direction==='desc'?'selected':''}>▼ 大→小</option></select></div>`}
 function renderCrossPlatform(){
@@ -1014,21 +1073,40 @@ function renderCrossPlatform(){
   $('crossPlatformBody').innerHTML=list.map(x=>'<tr>'+cols.map(k=>`<td>${cell(x,k)}</td>`).join('')+'</tr>').join('')||`<tr><td colspan="${Math.max(1,cols.length)}" class="muted">此期間尚無資料</td></tr>`;
 }
 function renderPlatformCompare(){
-  const startDate=$('platformStart')?.value||'',endDate=$('platformEnd')?.value||'',selected=$('platformFilter')?.value||'all';
-  const platformIds=selected==='all'?PLATFORMS.map(p=>p.id):[selected];
-  let list=platformIds.map(k=>{
-    const rows=salesHistory.filter(r=>dateInRange(r.date,startDate,endDate)&&r.platform===k);
-    const units=rows.reduce((s,r)=>s+n(r.unitsSold),0);
-    const fallbackOrders=rows.reduce((s,r)=>s+n(r.orderCount),0);
-    const totals=orderTotalsForRange(startDate,endDate,k),orders=totals.hasOrders?totals.orderCount:fallbackOrders;
-    const traffic=trafficTotalsForRange(startDate,endDate,k),uv=traffic.uv;
-    return{platform:k,revenue:totals.revenue,shipping:totals.shipping,units,orders,uv,conversion:uv?orders/uv:0};
-  }).filter(x=>x.revenue||x.shipping||x.units||x.orders||x.uv);
-  sortDataRows(list,platformSort);
-  if($('platformCompareHead'))$('platformCompareHead').innerHTML=`<tr><th>${sortHeader('平台','platform','platform',platformSort)}</th><th>${sortHeader('營業額','revenue','platform',platformSort)}</th><th>${sortHeader('已收運費','shipping','platform',platformSort)}</th><th>${sortHeader('銷量','units','platform',platformSort)}</th><th>${sortHeader('訂單數','orders','platform',platformSort)}</th><th>${sortHeader('非重複訪客數','uv','platform',platformSort)}</th><th>${sortHeader('轉換率','conversion','platform',platformSort)}</th></tr>`;
-  $('platformCompareBody').innerHTML=list.map(g=>`<tr><td>${esc(PLATFORMS.find(p=>p.id===g.platform)?.name||g.platform)}</td><td>${formatInteger(g.revenue)}</td><td>${formatInteger(g.shipping)}</td><td>${formatInteger(g.units)}</td><td>${formatInteger(g.orders)}</td><td>${formatInteger(g.uv)}</td><td>${(g.conversion*100).toFixed(2)}%</td></tr>`).join('')||'<tr><td colspan="7" class="muted">此期間尚無資料</td></tr>';
+  try{
+    const startDate=$('platformStart')?.value||'',endDate=$('platformEnd')?.value||'',selected=$('platformFilter')?.value||'all';
+    const platformIds=selected==='all'?PLATFORMS.map(p=>p.id):[selected];if($('platformDataStatus'))$('platformDataStatus').textContent=`已載入：銷售紀錄 ${salesHistory.length.toLocaleString()}／唯一訂單 ${ordersHistory.length.toLocaleString()}／全店訪問報告 ${trafficHistory.length.toLocaleString()}`;
+    let list=platformIds.map(k=>{
+      const rows=salesHistory.filter(r=>dateInRange(r.date||r.periodEnd||r.periodStart,startDate,endDate)&&r.platform===k);
+      const units=rows.reduce((s,r)=>s+n(r.unitsSold),0);
+      const fallbackOrders=rows.reduce((s,r)=>s+n(r.orderCount),0);
+      const totals=orderTotalsForRange(startDate,endDate,k),orders=totals.hasOrders?totals.orderCount:fallbackOrders;
+      const traffic=trafficTotalsForRange(startDate,endDate,k),uv=traffic.uv;
+      return{platform:k,revenue:totals.revenue,shipping:totals.shipping,units,orders,uv,conversion:uv?orders/uv:0};
+    }).filter(x=>x.revenue||x.shipping||x.units||x.orders||x.uv);
+    sortDataRows(list,platformSort);
+    if($('platformCompareHead'))$('platformCompareHead').innerHTML=`<tr><th>${sortHeader('平台','platform','platform',platformSort)}</th><th>${sortHeader('營業額','revenue','platform',platformSort)}</th><th>${sortHeader('已收運費','shipping','platform',platformSort)}</th><th>${sortHeader('銷量','units','platform',platformSort)}</th><th>${sortHeader('訂單數','orders','platform',platformSort)}</th><th>${sortHeader('非重複訪客數','uv','platform',platformSort)}</th><th>${sortHeader('轉換率','conversion','platform',platformSort)}</th></tr>`;
+    if($('platformCompareBody'))$('platformCompareBody').innerHTML=list.map(g=>`<tr><td>${esc(PLATFORMS.find(p=>p.id===g.platform)?.name||g.platform)}</td><td>${formatInteger(g.revenue)}</td><td>${formatInteger(g.shipping)}</td><td>${formatInteger(g.units)}</td><td>${formatInteger(g.orders)}</td><td>${formatInteger(g.uv)}</td><td>${(g.conversion*100).toFixed(2)}%</td></tr>`).join('')||'<tr><td colspan="7" class="muted">此期間尚無資料。請確認已匯入銷售資料／唯一訂單／全店訪問報告。</td></tr>';
+  }catch(e){
+    console.error('平台比較渲染失敗',e);
+    if($('platformCompareHead'))$('platformCompareHead').innerHTML='<tr><th>平台比較讀取錯誤</th></tr>';
+    if($('platformCompareBody'))$('platformCompareBody').innerHTML=`<tr><td class="muted">${esc(e.message||String(e))}</td></tr>`;
+  }
 }
-function initOverviewDates(){const dates=salesHistory.map(r=>cleanText(r.date)).filter(Boolean).sort();if(dates.length&&!$('overviewStart').value&&!$('overviewEnd').value){$('overviewStart').value=dates[0];$('overviewEnd').value=dates[dates.length-1]}}
+function initOverviewDates(){
+  const dates=[
+    ...salesHistory.map(r=>normalizeFilterDate(r.date||r.periodEnd||r.periodStart)),
+    ...ordersHistory.map(r=>normalizeFilterDate(r.date)),
+    ...trafficHistory.flatMap(r=>[normalizeFilterDate(r.periodStart),normalizeFilterDate(r.periodEnd)])
+  ].filter(Boolean).sort();
+  if(!dates.length)return;
+  if($('overviewStart')&&!$('overviewStart').value)$('overviewStart').value=dates[0];
+  if($('overviewEnd')&&!$('overviewEnd').value)$('overviewEnd').value=dates[dates.length-1];
+  if($('platformStart')&&!$('platformStart').value)$('platformStart').value=dates[0];
+  if($('platformEnd')&&!$('platformEnd').value)$('platformEnd').value=dates[dates.length-1];
+  if($('crossStart')&&!$('crossStart').value)$('crossStart').value=dates[0];
+  if($('crossEnd')&&!$('crossEnd').value)$('crossEnd').value=dates[dates.length-1];
+}
 
 async function countCollection(name){const s=await getDocs(collection(db,name));return s.size}
 async function refreshMaintenance(){const entries=await Promise.all(Object.entries(MAINT_COLLECTIONS).map(async([k,l])=>[k,l,await countCollection(k)]));$('maintenanceCounts').innerHTML=entries.map(([k,l,c])=>`<label class="maintenance-row"><input type="checkbox" value="${k}"><span>${l}</span><strong>${c}</strong></label>`).join('');await runHealthCheck(false)}
@@ -1070,3 +1148,6 @@ onAuthStateChanged(auth,async user=>{if(user){$('loginView').classList.add('hidd
 $('importRakutenProductMetricsBtn')?.addEventListener('click',handleRakutenProductMetricsImport);
 
 $('importRakutenWholeShopTrafficBtn')?.addEventListener('click',handleRakutenWholeShopTrafficImport);
+
+window.addEventListener('error',e=>console.error('Global error:',e.error||e.message));
+window.addEventListener('unhandledrejection',e=>console.error('Unhandled promise rejection:',e.reason));

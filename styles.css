@@ -88,3 +88,5 @@ dialog{border-radius:12px}
 
 /* V1.2.20 KPI 說明 */
 .metric-help{display:block;margin-top:6px;color:#6b7a90;font-size:11px;line-height:1.35;font-weight:400}.overview-kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+
+.overview-data-status{padding:6px 2px 2px;font-size:12px}

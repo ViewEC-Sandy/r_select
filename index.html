@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.20</small>
+        <small>Product Database V1.2.22</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -101,6 +101,7 @@
           <button id="applyOverviewBtn" type="button">套用</button>
           <button id="resetOverviewBtn" type="button" class="secondary">全部期間</button>
         </section>
+        <div id="overviewDataStatus" class="muted overview-data-status"></div>
         <section class="overview-kpis">
           <article class="card stat"><span>非重複訪客數 (UV)</span><strong id="ovUniqueVisitors">0</strong></article>
           <article class="card stat"><span>銷售商品數</span><strong id="ovUnitsSold">0</strong></article>
@@ -123,7 +124,7 @@
         </section>
       </section>
       <section id="crossPlatformView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>商品跨平台</h2><div class="period-filter"><label>開始日期<input id="crossStart" type="date"></label><label>結束日期<input id="crossEnd" type="date"></label><label>平台<select id="crossPlatformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>已收運費</span><strong id="crossShipping">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead id="crossPlatformHead"></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>
-      <section id="platformCompareView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>平台比較</h2><div class="period-filter"><label>開始日期<input id="platformStart" type="date"></label><label>結束日期<input id="platformEnd" type="date"></label><label>平台<select id="platformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div class="table-wrap"><table><thead id="platformCompareHead"></thead><tbody id="platformCompareBody"></tbody></table></div></section></section>
+      <section id="platformCompareView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>平台比較</h2><div class="period-filter"><label>開始日期<input id="platformStart" type="date"></label><label>結束日期<input id="platformEnd" type="date"></label><label>平台<select id="platformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div id="platformDataStatus" class="muted overview-data-status"></div><div class="table-wrap"><table><thead id="platformCompareHead"></thead><tbody id="platformCompareBody"></tbody></table></div></section></section>
 
       <section id="importView" class="hidden overview-page import-page">
         <section class="card overview-toolbar">
