@@ -985,8 +985,29 @@ async function importRakutenWholeShopTraffic(file){
   return{...range,pages,totalPV:pages.wholeShop.pv,totalUV:pages.wholeShop.uv};
 }
 async function handleRakutenWholeShopTrafficImport(){
-  const file=$('rakutenWholeShopTrafficFile')?.files?.[0];if(!file)return toast('請先選擇台灣樂天全店訪問報告');const btn=$('importRakutenWholeShopTrafficBtn');if(btn)btn.disabled=true;
-  try{setImportProgress('讀取台灣樂天全店訪問報告…',10);const r=await importRakutenWholeShopTraffic(file);setImportProgress(`全店流量匯入完成：${r.start} ～ ${r.end}；PV ${formatInteger(r.totalPV)}；UV ${formatInteger(r.totalUV)}`,100);await loadAll();toast('全店訪問報告匯入完成')}catch(e){console.error(e);setImportProgress(`匯入失敗：${e.message||e}`,100)}finally{if(btn)btn.disabled=false}
+  const files=[...($('rakutenWholeShopTrafficFile')?.files||[])];
+  if(!files.length)return toast('請先選擇台灣樂天全店訪問報告');
+  const btn=$('importRakutenWholeShopTrafficBtn');
+  if(btn)btn.disabled=true;
+  try{
+    const results=[];
+    for(let i=0;i<files.length;i++){
+      const file=files[i];
+      setImportProgress(`讀取全店訪問報告 ${i+1}/${files.length}：${file.name}`,Math.round(5+(i/files.length)*85));
+      const r=await importRakutenWholeShopTraffic(file);
+      results.push(r);
+      await yieldToUI();
+    }
+    const pv=results.reduce((s,r)=>s+n(r.totalPV),0),uv=results.reduce((s,r)=>s+n(r.totalUV),0);
+    setImportProgress(`全店流量匯入完成：${results.length} 份報告；PV ${formatInteger(pv)}；UV ${formatInteger(uv)}`,100);
+    await loadAll();
+    toast(`全店訪問報告匯入完成：${results.length} 份`);
+  }catch(e){
+    console.error(e);
+    setImportProgress(`匯入失敗：${e.message||e}`,100);
+  }finally{
+    if(btn)btn.disabled=false;
+  }
 }
 
 function getOverviewRows(){const start=$('overviewStart').value,end=$('overviewEnd').value,platform=$('overviewPlatform').value;return salesHistory.filter(r=>dateInRange(r.date||r.periodEnd||r.periodStart,start,end)&&(platform==='all'||r.platform===platform))}
@@ -1014,7 +1035,7 @@ function renderOverview(){
   const fallbackOrders=rows.reduce((s,r)=>s+n(r.orderCount),0);
   const totals=orderTotalsForRange(startDate,endDate,platform);
   const orders=totals.hasOrders?totals.orderCount:fallbackOrders,revenue=totals.revenue;
-  const traffic=trafficTotalsForRange(startDate,endDate,platform),pv=traffic.pv,uv=traffic.uv;if($('overviewDataStatus'))$('overviewDataStatus').textContent=`已載入：商品 ${products.length.toLocaleString()}／銷售紀錄 ${salesHistory.length.toLocaleString()}／唯一訂單 ${ordersHistory.length.toLocaleString()}／全店訪問報告 ${trafficHistory.length.toLocaleString()}`;
+  const traffic=trafficTotalsForRange(startDate,endDate,platform),pv=traffic.pv,uv=traffic.uv;if($('overviewDataStatus'))$('overviewDataStatus').textContent=`已載入：商品 ${products.length.toLocaleString()}／銷售紀錄 ${salesHistory.length.toLocaleString()}／唯一訂單 ${ordersHistory.length.toLocaleString()}／全店訪問報告 ${trafficHistory.length.toLocaleString()} 份（流量報告為期間彙總資料）`;
   $('ovUniqueVisitors').textContent=formatInteger(uv);
   $('ovUnitsSold').textContent=formatInteger(units);
   $('ovOrders').textContent=formatInteger(orders);
@@ -1055,8 +1076,21 @@ function renderOverview(){
   // 流量趨勢：改用全店訪問報告的非重複訪客數，不再使用商品頁 PV。
   const reports=trafficReportsForRange(startDate,endDate,platform).sort((a,b)=>String(a.periodEnd).localeCompare(String(b.periodEnd)));
   const trafficLabels=reports.map(r=>`${r.periodStart}～${r.periodEnd}`);
-  if(trafficTrendChart)trafficTrendChart.destroy();
-  trafficTrendChart=new Chart($('trafficTrendChart'),{type:'line',data:{labels:trafficLabels,datasets:[{label:'非重複訪客數',data:reports.map(r=>n(r.totalUV)),tension:.2},{label:'訂單數',data:reports.map(r=>orderTotalsForRange(r.periodStart,r.periodEnd,r.platform).orderCount),tension:.2}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true}}}});
+  const trafficDatasets=[
+    {label:'非重複訪客數',data:reports.map(r=>n(r.totalUV)),tension:.2,pointRadius:5,pointHoverRadius:7},
+    {label:'訂單數',data:reports.map(r=>orderTotalsForRange(r.periodStart,r.periodEnd,r.platform).orderCount),tension:.2,pointRadius:5,pointHoverRadius:7}
+  ];
+  if(reports.length===1){
+    // 單一彙總報告沒有時間序列，改用柱狀圖避免看起來像空白。
+    trafficTrendChart=safeChart('trafficTrendChart',trafficTrendChart,{type:'bar',data:{labels:trafficLabels,datasets:trafficDatasets},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true}},plugins:{tooltip:{enabled:true}}}});
+    if($('trafficTrendNote'))$('trafficTrendNote').textContent='目前只有 1 份期間彙總報告，因此顯示單一期間比較，尚無法形成真正的時間趨勢。請匯入 2 份以上不同時間範圍的全店訪問報告。';
+  }else if(reports.length>1){
+    trafficTrendChart=safeChart('trafficTrendChart',trafficTrendChart,{type:'line',data:{labels:trafficLabels,datasets:trafficDatasets},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true}}}});
+    if($('trafficTrendNote'))$('trafficTrendNote').textContent=`目前以 ${reports.length} 份全店訪問報告呈現期間趨勢。`;
+  }else{
+    trafficTrendChart=safeChart('trafficTrendChart',trafficTrendChart,{type:'bar',data:{labels:[],datasets:trafficDatasets},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true}}}});
+    if($('trafficTrendNote'))$('trafficTrendNote').textContent='目前篩選期間沒有全店訪問報告。請先至「資料匯入」上傳台灣樂天全店訪問報告。';
+  }
 
   if(platformRevenueChart)platformRevenueChart.destroy();const pLabels=[...byPlatform.keys()].map(x=>PLATFORMS.find(p=>p.id===x)?.name||x);platformRevenueChart=new Chart($('platformRevenueChart'),{type:'doughnut',data:{labels:pLabels,datasets:[{data:[...byPlatform.values()]}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%'}});
 }

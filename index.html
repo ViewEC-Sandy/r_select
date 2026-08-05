@@ -24,7 +24,7 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.22</small>
+        <small>Product Database V1.2.23</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
@@ -117,7 +117,7 @@
           <article class="card chart-card"><h3>銷售趨勢</h3><canvas id="salesTrendChart"></canvas></article>
           <article class="card chart-card chart-card-wide"><h3>銷售數量 Top 10</h3><canvas id="rankingChart"></canvas></article>
         </section>
-        <section class="overview-grid extra-charts"><article class="card chart-card"><h3>流量趨勢</h3><canvas id="trafficTrendChart"></canvas></article><article class="card chart-card"><h3>平台營收占比</h3><canvas id="platformRevenueChart"></canvas></article></section>
+        <section class="overview-grid extra-charts"><article class="card chart-card"><h3>流量趨勢</h3><canvas id="trafficTrendChart"></canvas><div id="trafficTrendNote" class="chart-note muted"></div></article><article class="card chart-card"><h3>平台營收占比</h3><canvas id="platformRevenueChart"></canvas></article></section>
         <section class="card ranking-card">
           <div class="section-head"><h3>商品銷售排行榜</h3><div><select id="rankingSort"><option value="units_desc">銷售數量：大到小</option><option value="units_asc">銷售數量：小到大</option><option value="revenue_desc">營業額：大到小</option><option value="revenue_asc">營業額：小到大</option><option value="orders_desc">訂單數：大到小</option><option value="price_desc">單價：大到小</option></select> <span id="rankingPeriod" class="muted"></span></div></div>
           <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
@@ -155,10 +155,10 @@
             <div class="import-rule-box">
               <h3>台灣樂天｜全店訪問報告（獨立匯入）</h3>
               <div class="import-controls">
-                <input id="rakutenWholeShopTrafficFile" type="file" accept=".xlsx,.xls,.csv">
+                <input id="rakutenWholeShopTrafficFile" type="file" accept=".xlsx,.xls,.csv" multiple>
                 <button id="importRakutenWholeShopTrafficBtn" type="button">匯入全店訪問報告</button>
               </div>
-              <p class="muted">用途：全店流量（PV + UV）。系統先讀取【時間範圍】，再以第 3 列作為表頭，讀取【所有頁面檢視】與【所有非重複訪客】，並保存【全店頁面】【商品頁面】【店家類別頁面】【店家首頁】各自的 PV / UV。營運總覽與平台比較的 UV 指標使用此報告中的【全店頁面】數據。</p>
+              <p class="muted">用途：全店流量（PV + UV）。系統先讀取【時間範圍】，再讀取【所有頁面檢視】與【所有非重複訪客】，並保存【全店頁面】【商品頁面】【店家類別頁面】【店家首頁】各自的 PV / UV。注意：你目前提供的報告是「整個時間範圍的彙總值」，不是逐日明細；單一報告只能形成 1 個期間資料點。可一次選取多份不同期間報告，才會形成真正的流量趨勢。</p>
             </div>
             <div class="import-rule-box">
               <h3>台灣樂天｜商品銷售數據（獨立匯入）</h3>

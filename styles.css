@@ -90,3 +90,5 @@ dialog{border-radius:12px}
 .metric-help{display:block;margin-top:6px;color:#6b7a90;font-size:11px;line-height:1.35;font-weight:400}.overview-kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
 
 .overview-data-status{padding:6px 2px 2px;font-size:12px}
+
+.chart-note{padding:8px 12px 4px;font-size:12px;line-height:1.5}
