@@ -40,6 +40,7 @@ let crossSort={key:'revenue',direction:'desc'}, platformSort={key:'revenue',dire
 const CROSS_COLUMN_DEFS=[['spec','商品規格管理編號'],['base','商品管理編號'],['title','商品名'],['platform','平台'],['revenue','營業額'],['shipping','已收運費'],['units','銷量'],['orders','訂單數']];
 let crossVisibleColumns=JSON.parse(localStorage.getItem('crossVisibleColumns')||'null')||CROSS_COLUMN_DEFS.map(x=>x[0]);
 let sortState={key:'',direction:'asc'}, columnFilters={}, activeFilterKey='';
+let productFormOriginal=null, productFormManualOverrides=new Set();
 const $=id=>document.getElementById(id); const n=v=>Number(v)||0; const round=v=>Math.round(v); const ceilKg=g=>Math.ceil(n(g)/1000);
 function toast(msg){$('toast').textContent=msg;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),2800)}
 function setImportProgress(message,percent=null){
@@ -86,30 +87,48 @@ function compute(base){
   const storeCode=store?.code||extractStoreCode(p.storeCode,p.productManagementId,p.specManagementId);
   const storeName=store?.name||p.storeName||'';
   const japanUrl=validUrl(p.japanUrl)||'';
-  const productCost=price?price*params.productCostRate:null;
+
+  const autoProductCost=price?price*params.productCostRate:null;
+  const productCost=ov.productCostTWD?n(p.productCostTWD):autoProductCost;
+
   const domesticJPY=price?(price>=params.freeDomesticJPY?0:n(store?.shippingJPY)||params.domesticShippingJPY):null;
-  const domestic=domesticJPY===null?null:domesticJPY*params.productCostRate;
-  const method=weight?(weight<=600?'統一':'新日誠'):'';
-  const uni=weight?(weight<=1000?params.uniFirstKgTWD:params.uniFirstKgTWD+Math.ceil((weight-1000)/500)*params.uniEachHalfKgTWD):null;
-  let nisshin=null;if(weight){const kg=weight/1000;if(kg>13)nisshin='超重';else{const tier=params.tiers.find(([max])=>kg<=max);nisshin=tier?round(tier[1]*params.nisshinRate*params.nisshinDiscount+params.nisshinFixedFeeTWD):null}}
-  const fixed=method==='統一'?uni:nisshin;
-  const suggested=price?calcSuggested(productCost,domestic,fixed,weight):null;
+  const autoDomestic=domesticJPY===null?null:domesticJPY*params.productCostRate;
+  const domestic=ov.domesticShippingTWD?n(p.domesticShippingTWD):autoDomestic;
+
+  const method=weight?(weight<600?'統一':'新日誠'):'';
+  const autoUni=weight?(weight<=1000?params.uniFirstKgTWD:params.uniFirstKgTWD+Math.ceil((weight-1000)/500)*params.uniEachHalfKgTWD):null;
+  const uni=ov.uniCostTWD?n(p.uniCostTWD):autoUni;
+
+  let autoNisshin=null;
+  if(weight){const kg=weight/1000;if(kg>13)autoNisshin='超重';else{const tier=params.tiers.find(([max])=>kg<=max);autoNisshin=tier?round(tier[1]*params.nisshinRate*params.nisshinDiscount+params.nisshinFixedFeeTWD):null}}
+  const nisshin=ov.nisshinCostTWD?n(p.nisshinCostTWD):autoNisshin;
+
+  const autoFixed=method==='統一'?uni:nisshin;
+  const fixed=ov.fixedLogisticsCostTWD?n(p.fixedLogisticsCostTWD):autoFixed;
+
+  const autoSuggested=price?calcSuggested(productCost,domestic,fixed,weight):null;
+  const suggested=ov.suggestedPrice30TWD?n(p.suggestedPrice30TWD):autoSuggested;
   const manual=ov.manualPriceTWD?n(p.manualPriceTWD):suggested;
-  const customer=manual!==null?(manual>=params.freeShippingTWD?0:ceilKg(weight)*params.customerShippingPerKgTWD):null;
-  const gross=manual!==null?manual+customer:null;
-  const fee=manual!==null?manual*params.platformFeeRate:null;
-  const profit=gross!==null&&typeof fixed==='number'?gross-fee-fixed-productCost-domestic:null;
-  const margin=gross?profit/gross:null;
+  const autoCustomer=manual!==null?(manual>=params.freeShippingTWD?0:ceilKg(weight)*params.customerShippingPerKgTWD):null;
+  const customer=ov.customerShippingTWD?n(p.customerShippingTWD):autoCustomer;
+  const autoGross=manual!==null?manual+customer:null;
+  const gross=ov.grossReceivedTWD?n(p.grossReceivedTWD):autoGross;
+  const autoFee=manual!==null?manual*params.platformFeeRate:null;
+  const fee=ov.platformFeeTWD?n(p.platformFeeTWD):autoFee;
+  const autoProfit=gross!==null&&typeof fixed==='number'?gross-fee-fixed-productCost-domestic:null;
+  const profit=ov.profitTWD?n(p.profitTWD):autoProfit;
+  const autoMargin=gross?profit/gross:null;
+  const margin=ov.profitRate?n(p.profitRate):autoMargin;
   const conversion=n(p.pageViews)>0?n(p.orderCount)/n(p.pageViews):null;
   const values={storeCode,storeName,japanUrl,productCostTWD:productCost,domesticShippingJPY:domesticJPY,domesticShippingTWD:domestic,logisticsMethod:method,uniCostTWD:uni,nisshinCostTWD:nisshin,fixedLogisticsCostTWD:fixed,manualPriceTWD:manual,customerShippingTWD:customer,grossReceivedTWD:gross,platformFeeTWD:fee,profitTWD:profit,profitRate:margin,suggestedPrice30TWD:suggested,conversionRate:conversion};
-  Object.keys(values).forEach(k=>{if(ov[k])values[k]=p[k]});return {...p,...values};
+  return {...p,...values};
 }
 function calcSuggested(j,k,o,weight){const target=params.targetProfitRate,denom=1-params.platformFeeRate-target;if(denom<=0)return null;const ship=ceilKg(weight)*params.customerShippingPerKgTWD;const candidate=((n(j)+n(k)+n(o))-ship*(1-target))/denom;return round(candidate>=params.freeShippingTWD?(n(j)+n(k)+n(o))/denom:candidate)}
 function reverseJPYFromTargetTWD(targetPriceTWD,weight,store){
   const manual=Number(targetPriceTWD), rate=Number(params.productCostRate), target=Number(params.targetProfitRate);
   if(!Number.isFinite(manual)||manual<=0||!Number.isFinite(rate)||rate<=0)return null;
   const w=n(weight);
-  const method=w?(w<=600?'統一':'新日誠'):'';
+  const method=w?(w<600?'統一':'新日誠'):'';
   const uni=w?(w<=1000?params.uniFirstKgTWD:params.uniFirstKgTWD+Math.ceil((w-1000)/500)*params.uniEachHalfKgTWD):0;
   let nisshin=0;
   if(w){const kg=w/1000;if(kg>13)return null;const tier=params.tiers.find(([max])=>kg<=max);nisshin=tier?round(tier[1]*params.nisshinRate*params.nisshinDiscount+params.nisshinFixedFeeTWD):0}
@@ -246,14 +265,50 @@ function openDiscountDialog(){if(!selectedProductIds.size)return toast('請先�
 function exportDiscountResults(){if(!discountResults.length)return toast('目前沒有試算結果');const rows=discountResults.map(r=>({'商品規格管理編號':r.specManagementId||'','商品管理編號':r.productManagementId||'','商品標題':r.title||'','折扣率':r.discountPercent,'原售價(TWD)':Math.round(n(r.manualPriceTWD)),'折扣後售價(TWD)':r.discountedPriceTWD,'折扣後客收運費(TWD)':r.discountedCustomerShippingTWD,'折扣後平台費(TWD)':Math.round(n(r.discountedPlatformFeeTWD)),'折扣後利潤(TWD)':r.discountedProfitTWD===null?'':Math.round(r.discountedProfitTWD),'折扣後利潤率':r.discountedProfitRate??''}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'折扣利潤試算');XLSX.writeFile(wb,`折扣利潤試算_${new Date().toISOString().slice(0,10)}.xlsx`)}
 
 function renderColumns(){if(currentView==='crossPlatform'){$('columnOptions').innerHTML=CROSS_COLUMN_DEFS.map(([k,l])=>`<label><input type="checkbox" value="${k}" ${crossVisibleColumns.includes(k)?'checked':''}>${esc(l)}</label>`).join('');return}const current=currentView==='sales'?salesVisibleColumns:visibleColumns;const allowed=currentView==='sales'?FIELDS.filter(([k])=>SALES_COLUMNS.includes(k)):FIELDS;$('columnOptions').innerHTML=allowed.map(([k,l])=>`<label><input type="checkbox" value="${k}" ${current.includes(k)?'checked':''}>${esc(l)}</label>`).join('')}
-function renderProductForm(p={}){const computed=compute(p);$('productId').value=p.id||'';$('productDialogTitle').textContent=p.id?'編輯商品':'新增商品';const pd=p.platformData||{};const platformHtml=`<div class="platform-editor full-span"><h3>平台資料</h3>${PLATFORMS.map(x=>`<fieldset><legend>${x.name}</legend><label><input type="checkbox" name="platform_${x.id}_enabled" ${pd[x.id]?.enabled?'checked':''}> 啟用此平台</label><label>售價<input type="number" step="any" name="platform_${x.id}_price" value="${esc(pd[x.id]?.price??'')}"></label><label>上架<select name="platform_${x.id}_active"><option value="true" ${pd[x.id]?.active!==false?'selected':''}>上架</option><option value="false" ${pd[x.id]?.active===false?'selected':''}>下架</option></select></label><label>備註<textarea name="platform_${x.id}_note">${esc(pd[x.id]?.note??'')}</textarea></label></fieldset>`).join('')}</div>`;$('productFields').innerHTML=platformHtml+FIELDS.filter(([k])=>!['conversionRate','storeCode','storeName','domesticShippingJPY'].includes(k)).map(([k,l,t,mode])=>{const v=computed[k]??'';if(k==='active')return`<label>${l}<select name="${k}"><option value="true" ${v!==false?'selected':''}>上架</option><option value="false" ${v===false?'selected':''}>下架</option></select></label>`;if(t==='textarea')return`<label>${l}<textarea name="${k}">${esc(v)}</textarea></label>`;const readonly=mode==='calculated'&&k==='logisticsMethod';const inputType=t==='number'||t==='percent'?'number':t==='url'?'url':'text';const step=t==='percent'?'0.0001':'any';const input=`<input name="${k}" type="${inputType}" step="${step}" value="${esc(v)}" ${readonly?'readonly':''}>`;if(mode==='calculated'&&!readonly)return`<label>${l}<span class="override-row">${input}<button type="button" class="secondary reset-override" data-reset="${k}">自動</button></span></label>`;return`<label>${l}${input}</label>`}).join('')}
-function renderParams(){
-  params={...DEFAULT_PARAMS,...(params||{})};
-  if(!Array.isArray(params.tiers)||!params.tiers.length)params.tiers=structuredClone(DEFAULT_PARAMS.tiers);
-  if($('paramsFields'))$('paramsFields').innerHTML=PARAM_DEFS.map(([k,l])=>`<label>${l}<input name="${k}" type="number" step="any" value="${params[k]??DEFAULT_PARAMS[k]??''}"></label>`).join('');
-  if($('shippingTierBody'))$('shippingTierBody').innerHTML=params.tiers.map((t,i)=>`<tr><td><input name="tierMax_${i}" type="number" step="any" value="${t[0]}"></td><td><input name="tierFee_${i}" type="number" step="any" value="${t[1]}"></td></tr>`).join('');
+function renderProductForm(p={}){
+  productFormOriginal={...p};
+  productFormManualOverrides=new Set(Object.entries(p.overrides||{}).filter(([,v])=>!!v).map(([k])=>k));
+  const computed=compute(p);$('productId').value=p.id||'';$('productDialogTitle').textContent=p.id?'編輯商品':'新增商品';const pd=p.platformData||{};
+  const platformHtml=`<div class="platform-editor full-span"><h3>平台資料</h3>${PLATFORMS.map(x=>`<fieldset><legend>${x.name}</legend><label><input type="checkbox" name="platform_${x.id}_enabled" ${pd[x.id]?.enabled?'checked':''}> 啟用此平台</label><label>售價<input type="number" step="any" name="platform_${x.id}_price" value="${esc(pd[x.id]?.price??'')}"></label><label>上架<select name="platform_${x.id}_active"><option value="true" ${pd[x.id]?.active!==false?'selected':''}>上架</option><option value="false" ${pd[x.id]?.active===false?'selected':''}>下架</option></select></label><label>備註<textarea name="platform_${x.id}_note">${esc(pd[x.id]?.note??'')}</textarea></label></fieldset>`).join('')}</div>`;
+  $('productFields').innerHTML=platformHtml+FIELDS.filter(([k])=>!['conversionRate','storeCode','storeName','domesticShippingJPY'].includes(k)).map(([k,l,t,mode])=>{
+    const v=computed[k]??'';
+    if(k==='active')return`<label>${l}<select name="${k}" data-field-key="${k}"><option value="true" ${v!==false?'selected':''}>上架</option><option value="false" ${v===false?'selected':''}>下架</option></select></label>`;
+    if(t==='textarea')return`<label>${l}<textarea name="${k}" data-field-key="${k}">${esc(v)}</textarea></label>`;
+    const readonly=mode==='calculated'&&k==='logisticsMethod';const inputType=t==='number'||t==='percent'?'number':t==='url'?'url':'text';const step=t==='percent'?'0.0001':'any';
+    const input=`<input name="${k}" data-field-key="${k}" data-field-mode="${mode}" type="${inputType}" step="${step}" value="${esc(v)}" ${readonly?'readonly':''}>`;
+    if(mode==='calculated'&&!readonly)return`<label>${l}<span class="override-row">${input}<button type="button" class="secondary reset-override" data-reset="${k}">自動</button></span></label>`;
+    return`<label>${l}${input}</label>`
+  }).join('');
 }
-async function saveProduct(form){const fd=new FormData(form),id=$('productId').value,old=id?products.find(p=>p.id===id):{};const data={...old,overrides:{...(old?.overrides||{})}};FIELDS.forEach(([k,,t,mode])=>{if(['conversionRate','storeCode','storeName','domesticShippingJPY'].includes(k))return;const raw=fd.get(k);if(raw===null)return;data[k]=t==='number'||t==='percent'?(raw===''?null:Number(raw)):t==='boolean'?raw==='true':String(raw);if(mode==='calculated'&&k!=='logisticsMethod'&&raw!=='')data.overrides[k]=true});data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);data.platformData={};PLATFORMS.forEach(x=>{data.platformData[x.id]={enabled:fd.get(`platform_${x.id}_enabled`)==='on',price:fd.get(`platform_${x.id}_price`)===''?null:Number(fd.get(`platform_${x.id}_price`)),active:fd.get(`platform_${x.id}_active`)==='true',note:String(fd.get(`platform_${x.id}_note`)||'')}});data.title=String(data.title||'').slice(0,100);data.updatedAt=serverTimestamp();if(!id)data.createdAt=serverTimestamp();const ref=id?doc(db,'products',id):doc(collection(db,'products'));await setDoc(ref,data,{merge:true});toast('商品已儲存');$('productDialog').close();await loadAll()}
+function readProductFormDraft(){
+  const base={...(productFormOriginal||{})}, overrides={};
+  productFormManualOverrides.forEach(k=>overrides[k]=true);
+  FIELDS.forEach(([k,,t])=>{
+    if(['conversionRate','storeCode','storeName','domesticShippingJPY'].includes(k))return;
+    const el=$('productFields').querySelector(`[name="${k}"]`);if(!el)return;
+    if(t==='number'||t==='percent')base[k]=el.value===''?null:Number(el.value);
+    else if(t==='boolean')base[k]=el.value==='true';
+    else base[k]=el.value;
+  });
+  base.overrides=overrides;
+  return base;
+}
+function updateProductFormCalculatedFields(changedKey=''){
+  const draft=readProductFormDraft(), computed=compute(draft);
+  FIELDS.forEach(([k,,t,mode])=>{
+    if(mode!=='calculated'||k==='logisticsMethod'&&false)return;
+    const el=$('productFields').querySelector(`[name="${k}"]`);if(!el||k===changedKey||productFormManualOverrides.has(k))return;
+    const v=computed[k];
+    if(t==='boolean')el.value=v?'true':'false';else el.value=v===null||v===undefined?'':v;
+  });
+  const methodEl=$('productFields').querySelector('[name="logisticsMethod"]');if(methodEl)methodEl.value=computed.logisticsMethod||'';
+}
+async function saveProduct(form){
+  const fd=new FormData(form),id=$('productId').value,old=id?products.find(p=>p.id===id):{};const data={...old,overrides:{}};
+  productFormManualOverrides.forEach(k=>data.overrides[k]=true);
+  FIELDS.forEach(([k,,t])=>{if(['conversionRate','storeCode','storeName','domesticShippingJPY'].includes(k))return;const raw=fd.get(k);if(raw===null)return;data[k]=t==='number'||t==='percent'?(raw===''?null:Number(raw)):t==='boolean'?raw==='true':String(raw)});
+  data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);data.platformData={};PLATFORMS.forEach(x=>{data.platformData[x.id]={enabled:fd.get(`platform_${x.id}_enabled`)==='on',price:fd.get(`platform_${x.id}_price`)===''?null:Number(fd.get(`platform_${x.id}_price`)),active:fd.get(`platform_${x.id}_active`)==='true',note:String(fd.get(`platform_${x.id}_note`)||'')}});data.title=String(data.title||'').slice(0,100);data.updatedAt=serverTimestamp();if(!id)data.createdAt=serverTimestamp();const ref=id?doc(db,'products',id):doc(collection(db,'products'));await setDoc(ref,data,{merge:true});toast('商品已儲存');$('productDialog').close();await loadAll()
+}
 function findHeader(row,aliases){const normalized=Object.fromEntries(Object.keys(row).map(k=>[cleanHeader(k),k]));for(const a of aliases){const hit=normalized[cleanHeader(a)];if(hit!==undefined)return hit}return null}
 function normalizeImportRows(rows){let parent={productManagementId:'',title:'',note:'',taiwanUrl:'',japanUrl:'',rtwBaseSku:''};return rows.map(row=>{const data={};for(const [key,aliases] of Object.entries(IMPORT_ALIASES)){const h=findHeader(row,aliases);if(h!==null)data[key]=row[h]}for(const k of Object.keys(data))data[k]=typeof data[k]==='string'?cleanText(data[k]):data[k];for(const k of ['productManagementId','title','note','taiwanUrl','japanUrl','rtwBaseSku']){if(cleanText(data[k]))parent[k]=data[k];else data[k]=parent[k]}data.specManagementId=cleanText(data.specManagementId);data.productManagementId=cleanText(data.productManagementId);data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);return data}).filter(r=>r.specManagementId)}
 async function exportProducts(){const rows=products.map(p=>{const r={};FIELDS.forEach(([k,l])=>r[l]=p[k]??'');PLATFORMS.forEach(x=>{const d=p.platformData?.[x.id]||{};r[`${x.name}-啟用`]=!!d.enabled;r[`${x.name}-售價`]=d.price??'';r[`${x.name}-上架`]=d.active!==false;r[`${x.name}-備註`]=d.note??''});return r});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'商品主檔');XLSX.writeFile(wb,`商品資料庫_${new Date().toISOString().slice(0,10)}.xlsx`)}
@@ -1376,7 +1431,9 @@ document.addEventListener('change',e=>{if(e.target.matches('[data-cross-sort]')&
 
 $('productTabBtn').onclick=()=>setView('products');if($('pricingTabBtn'))$('pricingTabBtn').onclick=()=>setView('pricing');if($('pricingSearch'))$('pricingSearch').oninput=renderPricingPage;if($('pricingTargetRate'))$('pricingTargetRate').oninput=()=>{renderPricingPage();renderPricingCart()};if($('pricingFreeShippingTWD'))$('pricingFreeShippingTWD').oninput=renderPricingPage;if($('pricingExportBtn'))$('pricingExportBtn').onclick=exportPricingResults;document.querySelectorAll('[data-pricing-filter-menu]').forEach(btn=>btn.onclick=e=>{e.stopPropagation();openPricingFilterMenu(btn.dataset.pricingFilterMenu,btn)});document.addEventListener('input',e=>{if(!e.target.matches('[data-pricing-menu-search]'))return;const panel=e.target.closest('#pricingExcelFilterMenu'),q=cleanText(e.target.value).toLowerCase();panel?.querySelectorAll('[data-pricing-value-label]').forEach(label=>label.classList.toggle('hidden',q&&!label.dataset.pricingValueLabel.includes(q)))});document.addEventListener('click',e=>{const panel=e.target.closest('#pricingExcelFilterMenu');if(!panel){if(!e.target.closest('[data-pricing-filter-menu]'))closePricingFilterMenu();return}e.stopPropagation();const key=activePricingFilterKey;if(e.target.closest('[data-pricing-menu-sort]')){pricingSortState={key,direction:e.target.closest('[data-pricing-menu-sort]').dataset.pricingMenuSort};renderPricingPage();closePricingFilterMenu();return}if(e.target.closest('[data-pricing-menu-clear-sort]')){if(pricingSortState.key===key)pricingSortState={key:'',direction:'asc'};renderPricingPage();closePricingFilterMenu();return}if(e.target.matches('[data-pricing-menu-all]')){panel.querySelectorAll('[data-pricing-menu-value]').forEach(x=>x.checked=e.target.checked);return}if(e.target.closest('[data-pricing-menu-clear]')){delete pricingColumnFilters[key];renderPricingPage();closePricingFilterMenu();return}if(e.target.closest('[data-pricing-menu-apply]')){const all=[...panel.querySelectorAll('[data-pricing-menu-value]')],selected=all.filter(x=>x.checked).map(x=>x.value);pricingColumnFilters[key]=selected.length===all.length?[]:selected;renderPricingPage();closePricingFilterMenu();return}});if($('pricingAddBtn'))$('pricingAddBtn').onclick=()=>{const spec=cleanText($('pricingSpecInput')?.value),qty=Math.max(1,Math.floor(n($('pricingQty').value)||1));if(!spec){if($('pricingAddMsg'))$('pricingAddMsg').textContent='請輸入商品規格管理編號';return}const p=products.find(x=>cleanText(x.specManagementId).toLowerCase()===spec.toLowerCase());if(!p){if($('pricingAddMsg'))$('pricingAddMsg').textContent='找不到此商品規格管理編號';return}const old=pricingCart.find(x=>x.id===p.id);if(old)old.qty+=qty;else pricingCart.push({id:p.id,qty});if($('pricingAddMsg'))$('pricingAddMsg').textContent=`已加入：${p.specManagementId||''} ${shortTitle(p.title||'')}`;if($('pricingSpecInput'))$('pricingSpecInput').value='';renderPricingCart()};if($('pricingClearBtn'))$('pricingClearBtn').onclick=()=>{pricingCart=[];renderPricingCart()};if($('pricingCartBody'))$('pricingCartBody').onclick=e=>{const i=e.target.dataset.pricingRemove;if(i===undefined)return;pricingCart.splice(Number(i),1);renderPricingCart()};if($('importTabBtn'))$('importTabBtn').onclick=()=>setView('imports');$('salesTabBtn').onclick=()=>{initSalesFilterDates();setView('sales')};$('overviewTabBtn').onclick=()=>{initOverviewDates();setView('overview')};$('crossPlatformTabBtn').onclick=()=>{initOverviewDates();setView('crossPlatform')};$('platformCompareTabBtn').onclick=()=>{initOverviewDates();setView('platformCompare')};$('applyOverviewBtn').onclick=renderOverview;$('overviewStart').onchange=renderOverview;$('overviewEnd').onchange=renderOverview;$('overviewPlatform').onchange=renderOverview;$('rankingSort').onchange=renderOverview;$('resetOverviewBtn').onclick=()=>{$('overviewStart').value='';$('overviewEnd').value='';$('overviewPlatform').value='all';renderOverview()};$('selectFilteredBtn').onclick=()=>{filtered().forEach(p=>selectedProductIds.add(p.id));renderTable();updateSelectionCount();toast('已選取全部篩選結果')};$('clearSelectionBtn').onclick=()=>{selectedProductIds.clear();renderTable();updateSelectionCount()};$('discountCalcBtn').onclick=openDiscountDialog;$('recalcDiscountBtn').onclick=renderDiscountResults;$('discountPercent').oninput=renderDiscountResults;$('exportDiscountBtn').onclick=exportDiscountResults;
 $('addProductBtn').onclick=()=>{renderProductForm({active:true});$('productDialog').showModal()};$('productForm').addEventListener('submit',async e=>{e.preventDefault();await saveProduct(e.currentTarget)});
-$('productFields').addEventListener('click',e=>{const k=e.target.dataset.reset;if(!k)return;const input=e.target.closest('label').querySelector(`[name="${k}"]`);input.value=''});
+$('productFields').addEventListener('input',e=>{const el=e.target.closest('[data-field-key]');if(!el||el.readOnly)return;const k=el.dataset.fieldKey;if(el.dataset.fieldMode==='calculated')productFormManualOverrides.add(k);if(k==='priceJPY'){['productCostTWD','suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate'].forEach(x=>productFormManualOverrides.delete(x))}if(k==='domesticShippingTWD'){['suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate'].forEach(x=>productFormManualOverrides.delete(x))}updateProductFormCalculatedFields(k)});
+$('productFields').addEventListener('change',e=>{const el=e.target.closest('[data-field-key]');if(!el||el.readOnly)return;const k=el.dataset.fieldKey;if(el.dataset.fieldMode==='calculated')productFormManualOverrides.add(k);if(k==='priceJPY'){['productCostTWD','suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate'].forEach(x=>productFormManualOverrides.delete(x))}if(k==='domesticShippingTWD'){['suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate'].forEach(x=>productFormManualOverrides.delete(x))}updateProductFormCalculatedFields(k)});
+$('productFields').addEventListener('click',e=>{const k=e.target.dataset.reset;if(!k)return;productFormManualOverrides.delete(k);updateProductFormCalculatedFields()});
 $('tableBody').addEventListener('change',e=>{const id=e.target.dataset.selectProduct;if(!id)return;e.target.checked?selectedProductIds.add(id):selectedProductIds.delete(id);updateSelectionCount()});
 $('tableHead').addEventListener('change',e=>{if(e.target.id!=='selectPageCheckbox')return;const list=filtered().slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);list.forEach(p=>e.target.checked?selectedProductIds.add(p.id):selectedProductIds.delete(p.id));renderTable();updateSelectionCount()});
 $('tableBody').addEventListener('click',async e=>{const id=e.target.dataset.edit||e.target.dataset.delete;if(!id)return;if(e.target.dataset.edit){renderProductForm(products.find(p=>p.id===id));$('productDialog').showModal()}else if(confirm('確定刪除此商品？')){await deleteDoc(doc(db,'products',id));await loadAll();toast('已刪除')}});
