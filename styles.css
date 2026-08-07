@@ -98,3 +98,11 @@ dialog{border-radius:12px}
 /* v1.2.27 pricing controls */
 .pricing-controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.pricing-controls label{display:grid;gap:6px;font-size:13px;color:var(--muted)}.pricing-controls input[type="number"]{width:120px}.pricing-add-row input[type="text"]{min-width:320px;flex:1}
 .pricing-kpis{display:grid;grid-template-columns:repeat(2,minmax(180px,280px));gap:12px;margin:12px 0 16px}.pricing-head-row th{vertical-align:bottom}.pricing-head-row th select{display:block;width:100%;min-width:92px;margin-top:6px;padding:5px 7px;font-size:11px;border:1px solid var(--border);border-radius:7px;background:#fff}.pricing-controls label:nth-child(2) input{width:150px}@media(max-width:720px){.pricing-kpis{grid-template-columns:1fr}}
+
+/* v1.2.29 pricing Excel-like filters + adjusted overall margin */
+.pricing-kpis{grid-template-columns:repeat(3,minmax(190px,300px));}
+.pricing-head-row th{vertical-align:middle;}
+.pricing-head-row .excel-header{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.pricing-head-row .excel-filter-button{flex:0 0 auto;}
+@media(max-width:900px){.pricing-kpis{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.pricing-kpis{grid-template-columns:1fr}}
