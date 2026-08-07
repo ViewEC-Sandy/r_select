@@ -274,8 +274,9 @@ function renderProductForm(p={}){
     const v=computed[k]??'';
     if(k==='active')return`<label>${l}<select name="${k}" data-field-key="${k}"><option value="true" ${v!==false?'selected':''}>上架</option><option value="false" ${v===false?'selected':''}>下架</option></select></label>`;
     if(t==='textarea')return`<label>${l}<textarea name="${k}" data-field-key="${k}">${esc(v)}</textarea></label>`;
-    const readonly=mode==='calculated'&&k==='logisticsMethod';const inputType=t==='number'||t==='percent'?'number':t==='url'?'url':'text';const step=t==='percent'?'0.0001':'any';
-    const input=`<input name="${k}" data-field-key="${k}" data-field-mode="${mode}" type="${inputType}" step="${step}" value="${esc(v)}" ${readonly?'readonly':''}>`;
+    const readonly=mode==='calculated'&&k==='logisticsMethod';const inputType=t==='number'||t==='percent'?'number':t==='url'?'url':'text';const step='any';
+    const displayValue=t==='percent'&&v!==''&&Number.isFinite(Number(v))?Number(v).toFixed(6).replace(/0+$/,'').replace(/\.$/,''):v;
+    const input=`<input name="${k}" data-field-key="${k}" data-field-mode="${mode}" type="${inputType}" step="${step}" value="${esc(displayValue)}" ${readonly?'readonly':''}>`;
     if(mode==='calculated'&&!readonly)return`<label>${l}<span class="override-row">${input}<button type="button" class="secondary reset-override" data-reset="${k}">自動</button></span></label>`;
     return`<label>${l}${input}</label>`
   }).join('');
@@ -299,7 +300,7 @@ function updateProductFormCalculatedFields(changedKey=''){
     if(mode!=='calculated'||k==='logisticsMethod'&&false)return;
     const el=$('productFields').querySelector(`[name="${k}"]`);if(!el||k===changedKey||productFormManualOverrides.has(k))return;
     const v=computed[k];
-    if(t==='boolean')el.value=v?'true':'false';else el.value=v===null||v===undefined?'':v;
+    if(t==='boolean')el.value=v?'true':'false';else if(t==='percent'&&v!==null&&v!==undefined&&Number.isFinite(Number(v)))el.value=Number(v).toFixed(6).replace(/0+$/,'').replace(/\.$/,'');else el.value=v===null||v===undefined?'':v;
   });
   const methodEl=$('productFields').querySelector('[name="logisticsMethod"]');if(methodEl)methodEl.value=computed.logisticsMethod||'';
 }
