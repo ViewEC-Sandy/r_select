@@ -1,0 +1,28 @@
+*{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans TC",sans-serif;background:#f4f7fb;color:#172033}button,input,select{font:inherit}.hidden{display:none!important}#loading{min-height:100vh;display:grid;place-items:center}.login{width:min(420px,90%);margin:10vh auto}.login input{width:100%;margin:8px 0}.layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}aside{background:#111a2e;color:#fff;padding:20px;display:flex;flex-direction:column}aside small{color:#9fb0d0}nav{display:grid;gap:8px;margin-top:24px}nav button{background:transparent;color:#c8d3e7;text-align:left;border:0;padding:12px;border-radius:10px}nav button.active,nav button:hover{background:#243454;color:#fff}.user{margin-top:auto;display:grid;gap:8px;font-size:12px}.danger{background:#fff0ee;color:#b42318}main{padding:28px;min-width:0}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}header h1{margin:5px 0}.filters{display:flex;gap:12px;align-items:end;background:#fff;padding:14px;border-radius:16px;margin-bottom:18px}.filters label{display:grid;gap:5px}.filters input,.filters select,.card input,.card select{padding:10px;border:1px solid #d5dbe5;border-radius:9px}.page{display:none}.page.active{display:block}.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(20,30,60,.07);margin-bottom:20px}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}.kpi{background:#fff;border-radius:16px;padding:18px;border:1px solid #e2e8f0}.kpi strong{font-size:24px;display:block;margin-top:8px}.pos{color:#087443}.neg{color:#b42318}.muted{color:#6b7280}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}.table{overflow:auto;max-height:560px}table{border-collapse:collapse;width:100%;min-width:850px}th,td{padding:11px 12px;border-bottom:1px solid #e5e7eb;text-align:left;white-space:nowrap}th{background:#f8fafc}.notice{background:#fff8e1;border:1px solid #f4d27b;padding:14px;border-radius:12px;margin-bottom:16px}canvas{max-height:340px}@media(max-width:1000px){.layout{grid-template-columns:1fr}aside{position:relative}.user{margin-top:20px}.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}@media(max-width:650px){main{padding:16px}.filters{flex-direction:column;align-items:stretch}.kpis{grid-template-columns:1fr}}
+.subfilters{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:12px 0 18px}.subfilters label{display:grid;gap:5px}.subfilters input,.subfilters select{min-width:150px}.ghost{background:#eef2f7}.card h3{margin-top:0}
+.summary-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.compact-table{max-height:340px}.compact-table table{min-width:620px}@media(max-width:800px){.summary-kpis{grid-template-columns:1fr}}
+
+.header-actions{display:flex;gap:8px;align-items:center}.kpi.clickable{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.kpi.clickable:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(20,30,60,.12)}.calendar-heatmap{display:grid;grid-template-columns:repeat(7,minmax(32px,1fr));gap:6px}.heat-cell{min-height:48px;border-radius:8px;padding:6px;background:#eef2f7;font-size:11px;display:flex;flex-direction:column;justify-content:space-between}.heat-cell[data-level="1"]{background:#dcefe5}.heat-cell[data-level="2"]{background:#b7dec8}.heat-cell[data-level="3"]{background:#7fc29c}.heat-cell[data-level="4"]{background:#3f9568;color:white}.heat-empty{background:transparent}.heat-weekday{font-weight:700;text-align:center;color:#6b7280;padding:4px}.card h3 small{font-weight:400;font-size:12px}@media print{aside,.filters,.header-actions,#viewerNotice{display:none!important}.layout{display:block}.page{display:none!important}#overview{display:block!important}main{padding:0}.card{box-shadow:none;break-inside:avoid}}
+/* V10.3.7: keep table headers visible while scrolling */
+.table thead th{position:sticky;top:0;z-index:3;background:#f8fafc;box-shadow:0 1px 0 #e5e7eb}
+
+.maintenance-checks{display:grid;grid-template-columns:repeat(3,minmax(160px,1fr));gap:12px;margin:16px 0}.maintenance-checks label{padding:12px;border:1px solid #e2e8f0;border-radius:10px}.danger-zone{border-color:#f0b4ae;background:#fff8f7}.maintenance-result{margin-top:16px;padding:14px;background:#f8fafc;border-radius:10px}.health-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}@media(max-width:700px){.maintenance-checks,.health-grid{grid-template-columns:1fr}}
+
+/* V11.3: compact product names in analysis and sales ranking */
+.product-name-short{display:inline-block;max-width:15em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;cursor:help}
+#paRows td:nth-child(4),#topProductRows td:nth-child(3){max-width:15em}
+
+
+/* V11.4: product-analysis CSV import progress */
+.import-progress{margin-top:10px;max-width:620px}
+.import-progress.hidden{display:none}
+.import-progress-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:6px;font-size:13px;color:#475569}
+.import-progress-head strong{color:#1d4ed8}
+.import-progress-track{height:10px;background:#e2e8f0;border-radius:999px;overflow:hidden}
+.import-progress-bar{height:100%;background:#2563eb;border-radius:999px;transition:width .18s ease}
+
+/* V11.4: compact Rakuten ad product-name column */
+#ads .table table{table-layout:auto;width:max-content;min-width:100%}
+#ads .table th,#ads .table td{width:auto}
+#ads .table th:nth-child(4),#ads .table td:nth-child(4){width:15em;max-width:15em}
+#ads .ad-product-name .product-name-short{max-width:15em}

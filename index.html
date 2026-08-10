@@ -1,295 +1,66 @@
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>線上商品資料庫</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-</head>
-<body>
-  <div id="loginView" class="center-card">
-    <h1>商品資料庫</h1>
-    <p class="muted">請使用管理員帳號登入</p>
-    <form id="loginForm">
-      <label>電子郵件<input id="loginEmail" type="email" required /></label>
-      <label>密碼<input id="loginPassword" type="password" required /></label>
-      <button type="submit">登入</button>
-      <p id="loginError" class="error"></p>
-    </form>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Japan EC Dashboard Enterprise V11</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script></head><body>
+<div id="loading">載入中…</div>
+<section id="login" class="hidden card login"><h1>Japan EC Dashboard Enterprise V11</h1><p>Firebase 多平台分析版</p><input id="email" type="email" placeholder="Email"><input id="password" type="password" placeholder="Password"><button id="loginBtn">登入</button><button id="resetBtn" class="ghost">忘記密碼</button><p id="loginMsg"></p></section>
+<div id="app" class="hidden layout"><aside><h2>Japan EC Dashboard</h2><small>V11.5 Partial Product Update</small><nav><button data-page="overview" class="active">營運總覽</button><button data-page="platforms">平台比較</button><button data-page="products">商品跨平台</button><button data-page="groups">專案分析</button><button data-page="ads">樂天廣告分析</button><button data-page="productAnalysis">商品分析</button><button data-page="master">商品主檔</button><button data-page="import" class="editor">資料匯入</button><button data-page="history">匯入紀錄</button><button data-page="maintenance" class="editor">系統維護</button></nav><div class="user"><span id="userText"></span><span id="roleText"></span><button id="logoutBtn" class="danger">登出</button></div></aside>
+<main><header><div><small>TAIWAN PAVILION / MULTI-PLATFORM</small><h1 id="title">營運總覽</h1></div><div class="header-actions"><button id="exportCsvBtn" class="ghost">匯出本頁 CSV</button><button id="exportExcelBtn" class="ghost">匯出本頁 Excel</button><button id="printBtn" class="ghost">列印／PDF</button><button id="refreshBtn">重新整理</button></div></header>
+<div id="viewerNotice" class="notice hidden">目前為 Viewer，只能查詢。請將 Firestore 的 users/{UID}/role 改為 manager 或 admin。</div>
+<div class="filters"><label>平台<select id="platform"><option value="">全部平台</option></select></label><label>開始日期<input id="start" type="date"></label><label>結束日期<input id="end" type="date"></label><label>比較<select id="compare"><option value="yoy">去年同期</option><option value="previous">前一期間</option><option value="none">不比較</option></select></label><label>圖表粒度<select id="granularity"><option value="month">月</option><option value="quarter">季</option><option value="year">年</option></select></label><button id="applyBtn">套用</button></div>
+<section id="overview" class="page active">
+<div id="kpis" class="kpis"></div>
+<div id="overviewMarketingKpis" class="kpis"></div>
+<div class="grid2"><div class="card"><h3>營收趨勢 <small class="muted">自動對齊比較期間</small></h3><canvas id="trend"></canvas></div><div class="card"><h3>平台營收占比</h3><canvas id="share"></canvas></div></div>
+<div class="grid2"><div class="card"><h3>流量趨勢</h3><canvas id="trafficTrend"></canvas></div><div class="card"><h3>商品銷售排行（營業額）</h3><div class="table compact-table"><table data-no-auto-filter="1"><thead><tr><th>排名</th><th>商品番号（SKU）</th><th>中文商品名</th><th>營業額</th><th>銷量</th></tr></thead><tbody id="topProductRows"></tbody></table></div></div></div>
+<div class="grid2"><div class="card"><h3>專案營收排行</h3><canvas id="projectRanking"></canvas></div><div class="card"><h3>每日營收熱力圖</h3><div id="calendarHeatmap" class="calendar-heatmap"></div></div></div>
+</section>
+<section id="platforms" class="page"><div class="card"><h3>各平台銷售比較</h3><div class="table"><table><thead><tr><th>平台</th><th>本期營收</th><th>比較期</th><th>差額</th><th>成長率</th><th>銷量</th><th>訂單數</th></tr></thead><tbody id="platformRows"></tbody></table></div></div></section>
+<section id="products" class="page"><div id="productTotals" class="kpis summary-kpis"></div><div class="card"><h3>商品跨平台分析</h3><div class="subfilters"><label>專案<select id="productProjectFilter"><option value="">全部專案</option></select></label><label>搜尋<input id="productSearch" placeholder="商品番号（SKU）、商品管理番号（商品編號）、中文商品名"></label></div><div class="table"><table data-no-auto-filter="1"><thead><tr><th>商品番号（SKU）</th><th>商品管理番号（商品編號）</th><th>中文商品名</th><th>平台</th><th>本期營收</th><th>比較期</th><th>成長率</th><th>銷量</th></tr></thead><tbody id="productRows"></tbody></table></div></div></section>
+<section id="groups" class="page"><div id="groupTotals" class="kpis summary-kpis"></div><div class="card"><h3>專案分析</h3><div class="subfilters"><label>搜尋專案<input id="groupSearch" placeholder="輸入專案名稱"></label></div><div class="table"><table data-no-auto-filter="1"><thead><tr><th>專案名稱</th><th>本期營收</th><th>比較期</th><th>差額</th><th>成長率</th><th>銷量</th><th>占比</th></tr></thead><tbody id="groupRows"></tbody></table></div></div></section>
+<section id="ads" class="page"><div id="adKpis" class="kpis"></div><div class="card"><h3>樂天廣告成效</h3><div class="subfilters"><label>開始月份<input id="adMonthStart" type="month"></label><label>結束月份<input id="adMonthEnd" type="month"></label><label>專案<select id="adProjectFilter"><option value="">全部專案</option></select></label><label>搜尋<input id="adSearch" placeholder="商品番号（SKU）、商品管理番号（商品編號）、商品名"></label><label>排序欄位<select id="adSort"><option value="adSpend">廣告花費</option><option value="salesAmount">銷售額</option><option value="clicks">點擊數</option><option value="salesOrders">銷售訂單數</option><option value="ctr">CTR</option><option value="cvr">CVR</option><option value="roas">ROAS</option><option value="month">月份</option></select></label><label>順序<select id="adOrder"><option value="desc">由大到小</option><option value="asc">由小到大</option></select></label></div><div class="table"><table><thead><tr><th>月份</th><th>商品番号（SKU）</th><th>商品管理番号（商品編號）</th><th>中文商品名</th><th>專案</th><th>CTR</th><th>點擊數</th><th>廣告花費</th><th>廣告銷售額</th><th>銷售訂單數</th><th>CVR</th><th>ROAS</th></tr></thead><tbody id="adRows"></tbody></table></div><p class="muted">CVR＝銷售訂單數 ÷ 點擊數 × 100%；ROAS＝銷售額 ÷ 廣告花費 × 100%。彙總 CTR 以點擊數加權平均顯示。</p></div></section>
+
+<section id="productAnalysis" class="page"><div id="paKpis" class="kpis"></div><div class="card"><h3>商品分析</h3><div class="subfilters"><label>開始月份<input id="paMonthStart" type="month"></label><label>結束月份<input id="paMonthEnd" type="month"></label><label>專案<select id="paProjectFilter"><option value="">全部專案</option></select></label><label>搜尋<input id="paSearch" placeholder="商品番号（SKU）、商品管理番号（商品編號）、商品名"></label><label>排序欄位<select id="paSort"><option value="sales">銷售額</option><option value="salesOrders">銷售訂單數</option><option value="salesQuantity">銷售商品數</option><option value="traffic">商品頁流量</option><option value="rppTraffic">RPP廣告流量</option><option value="organicTraffic">自然流量</option><option value="conversionRate">轉換率</option><option value="newOrders">新客訂單數</option><option value="repeatOrders">舊客訂單數</option><option value="favoriteNew">本月加入最愛</option><option value="favoriteTotal">加入最愛總計</option></select></label><label>順序<select id="paOrder"><option value="desc">由大到小</option><option value="asc">由小到大</option></select></label></div><div class="table"><table data-no-auto-filter="1"><thead><tr><th>月份</th><th>商品番号（SKU）</th><th>商品管理番号（商品編號）</th><th>中文商品名</th><th>銷售額</th><th>銷售訂單數</th><th>銷售商品數</th><th>商品頁流量</th><th>RPP廣告流量</th><th>自然流量</th><th>轉換率</th><th>新客訂單數</th><th>舊客訂單數</th><th>本月加入最愛</th><th>加入最愛總計</th></tr></thead><tbody id="paRows"></tbody></table></div><p class="muted">轉換率＝銷售訂單數 ÷ 商品頁流量 × 100%；自然流量＝商品頁流量－RPP 廣告點擊數。</p></div></section>
+<section id="master" class="page"><div class="card editor"><h3>上傳商品主檔</h3><label>匯入方式<select id="productImportMode">
+<option value="merge">更新／新增商品</option>
+<option value="partial">指定欄位更新（空白不修改）</option>
+<option value="replace">完全取代商品主檔</option>
+</select></label><input id="productFile" type="file" accept=".csv"><p id="productStatus">完整匯入：必要欄位為商品番号、商品管理番号、中文商品名。指定欄位更新：以「商品規格管理編號／商品番号」＋「商品管理編號／商品管理番号」雙重確認商品；CSV 有值才覆蓋，空白欄位不修改原資料。</p>
+<div id="partialUpdateHelp" class="notice hidden">
+<strong>指定欄位更新規則</strong>
+<p>必要識別欄位：商品規格管理編號（亦支援商品番号）＋ 商品管理編號（亦支援商品管理番号）。其餘欄位只要有值才會更新；空白不會清空原資料。</p>
+<p>可更新：中文商品名、專案名稱、廠商名、商品供應價、樂天日幣售價、NETSEA日幣售價、Shopify售價、商品條碼。</p>
+</div></div><div class="card"><h3>商品主檔資料</h3><input id="masterSearch" placeholder="搜尋商品番号（SKU）、商品管理番号（商品編號）、中文品名、專案、廠商或條碼"><div class="table"><table><thead><tr><th>商品番号（SKU）</th><th>商品管理番号（商品編號）</th><th>中文商品名</th><th>專案名稱</th><th>廠商名</th><th>商品供應價（NT$）</th><th>樂天日幣售價</th><th>NETSEA日幣售價</th><th>Shopify售價</th><th>商品條碼</th></tr></thead><tbody id="masterRows"></tbody></table></div></div></section>
+<section id="import" class="page"><div class="grid2"><div class="card editor"><h3>上傳銷售 CSV</h3><label>平台<select id="importPlatform"><option value="">請選擇平台</option><option value="rakuten">Rakuten</option><option value="shopify">Shopify</option></select></label><label>重複資料<select id="duplicate"><option value="skip">跳過重複</option><option value="overwrite">覆蓋既有</option></select></label><input id="salesFile" type="file" accept=".csv"><p id="salesStatus">Rakuten：自動讀取日文編碼；同一平台＋注文番号只計一次，既有重複匯入資料也會在報表端自動排除「商品合計金額＋送料合計－店舗発行クーポン利用額」。Shopify：日期讀取 Created at；Financial Status refunded 不匯入。</p></div><div class="card editor"><h3>上傳樂天廣告 CSV</h3><label>重複資料<select id="adDuplicate"><option value="skip">跳過重複</option><option value="overwrite">覆蓋既有</option></select></label><input id="adFile" type="file" accept=".csv"><p id="adStatus">自動讀取日文編碼，並自動將第 8 列辨識為表頭。讀取：日付、商品管理番号、CTR(%)、クリック数(合計)、実績額(合計)、売上金額(合計720時間)、売上件数(合計720時間)。</p></div><div class="card editor"><h3>上傳商品分析 CSV</h3><label>資料月份（自動辨識）<input id="paImportMonth" type="month" readonly></label><label>重複資料<select id="paDuplicate"><option value="overwrite">覆蓋既有</option><option value="skip">跳過重複</option></select></label><input id="paFile" type="file" accept=".csv"><p id="paStatus">自動判斷 UTF-8 / Shift_JIS 日文編碼；自動搜尋「表示期間」日期與商品分析表頭（不固定列數）。讀取欄位：商品番号、売上、売上件数、売上個数、アクセス人数、新規購入件数、リピート購入件数、お気に入り登録ユーザ数、お気に入り総ユーザ数。</p><div id="paProgressWrap" class="import-progress" aria-live="polite"><div class="import-progress-head"><span id="paProgressText">等待選擇商品分析 CSV</span><strong id="paProgressPercent">0%</strong></div><div class="import-progress-track"><div id="paProgressBar" class="import-progress-bar" style="width:0%"></div></div></div></div></div></section>
+
+<section id="maintenance" class="page">
+  <div class="card editor">
+    <h3>資料庫概況</h3>
+    <p class="muted">只清除匯入資料，登入帳號、使用者角色與 Firebase Authentication 不會被刪除。</p>
+    <div id="maintenanceCounts" class="kpis summary-kpis"></div>
+    <div class="header-actions"><button id="refreshMaintenanceBtn" class="ghost">重新整理筆數</button><button id="healthCheckBtn" class="ghost">執行系統檢查</button></div>
+    <div id="healthResult" class="maintenance-result muted">尚未執行系統檢查。</div>
   </div>
-
-  <div id="appView" class="hidden enterprise-layout">
-    <aside class="sidebar">
-      <div class="brand-block">
-        <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.2.31</small>
-      </div>
-      <nav class="side-nav" aria-label="主要功能">
-        <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
-        <button id="productTabBtn" type="button" class="side-nav-item active">商品資料庫</button>
-        <button id="pricingTabBtn" type="button" class="side-nav-item">定價試算</button>
-        <button id="salesTabBtn" type="button" class="side-nav-item">銷售狀態</button>
-        <button id="crossPlatformTabBtn" type="button" class="side-nav-item">商品跨平台</button>
-        <button id="platformCompareTabBtn" type="button" class="side-nav-item">平台比較</button>
-        <button id="importTabBtn" type="button" class="side-nav-item">資料匯入</button>
-        <div class="nav-separator"></div>
-        <button id="storeManagerBtn" type="button" class="side-nav-item">店鋪管理</button>
-        <button id="openParamsBtn" type="button" class="side-nav-item">參數設定</button>
-        <button id="maintenanceBtn" type="button" class="side-nav-item">系統維護</button>
-      </nav>
-      <div class="sidebar-user">
-        <span id="userEmail"></span>
-        <button id="logoutBtn" class="sidebar-logout">登出</button>
-      </div>
-    </aside>
-
-    <div class="enterprise-shell">
-      <header class="enterprise-header">
-        <div>
-          <small>TAIWAN PAVILION / MULTI-PLATFORM</small>
-          <h1 id="pageTitle">商品資料庫</h1>
-        </div>
-        <div class="header-actions">
-          <button id="exportBtn" class="secondary">匯出本頁 Excel</button>
-          <button id="columnBtn" class="secondary">顯示欄位</button>
-          <button id="clearColumnFiltersBtn" class="secondary">清除篩選</button>
-        </div>
-      </header>
-
-      <main class="enterprise-main">
-        <div id="databaseView">
-      <section class="toolbar card">
-        <div class="toolbar-row">
-          <input id="searchInput" type="search" placeholder="搜尋編號、標題、規格或備註" />
-          <select id="statusFilter"><option value="all">全部狀態</option><option value="true">上架</option><option value="false">下架</option></select>
-
-
-          <button id="selectFilteredBtn" class="secondary">選取全部篩選結果</button>
-          <button id="clearSelectionBtn" class="secondary">清除選取</button>
-          <button id="discountCalcBtn">折扣利潤試算</button>
-          <span id="selectionCount" class="selection-count">已選 0 筆</span>
-          <button id="addProductBtn">＋ 新增商品</button>
-        </div>
-        <div id="salesDateFilters" class="toolbar-row hidden">
-          <label class="sales-period">銷售開始<input id="salesFilterStart" type="date"></label>
-          <label class="sales-period">銷售結束<input id="salesFilterEnd" type="date"></label>
-          <span class="muted">銷售狀態依匯入時設定的報表期間篩選</span>
-        </div>
-      </section>
-
-      <section class="stats-grid">
-        <article class="card stat"><span>商品筆數</span><strong id="statProducts">0</strong></article>
-        <article class="card stat"><span>上架商品</span><strong id="statActive">0</strong></article>
-        <article class="card stat"><span>平均利潤率</span><strong id="statMargin">0%</strong></article>
-        <article class="card stat"><span>總銷售商品數</span><strong id="statUnits">0</strong></article>
-        <article id="statRevenueCard" class="card stat hidden"><span>總營業額(TWD)</span><strong id="statRevenue">0</strong></article>
-        <article id="statShippingCard" class="card stat hidden"><span>已收運費(TWD)</span><strong id="statShipping">0</strong></article>
-      </section>
-
-      <section class="card table-card">
-        <div class="table-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
-        <div class="pagination"><button id="prevPage" class="secondary">上一頁</button><span id="pageInfo"></span><button id="nextPage" class="secondary">下一頁</button></div>
-      </section>
-      </div>
-
-        <section id="overviewView" class="hidden overview-page">
-        <section class="card overview-toolbar">
-          <label>開始日期<input id="overviewStart" type="date"></label>
-          <label>結束日期<input id="overviewEnd" type="date"></label>
-          <label>平台<select id="overviewPlatform"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label>
-          <button id="applyOverviewBtn" type="button">套用</button>
-          <button id="resetOverviewBtn" type="button" class="secondary">全部期間</button>
-        </section>
-        <div id="overviewDataStatus" class="muted overview-data-status"></div>
-        <section class="overview-kpis">
-          <article class="card stat"><span>非重複訪客數 (UV)</span><strong id="ovUniqueVisitors">0</strong></article>
-          <article class="card stat"><span>銷售商品數</span><strong id="ovUnitsSold">0</strong></article>
-          <article class="card stat"><span>銷售訂單數</span><strong id="ovOrders">0</strong></article>
-          <article class="card stat"><span>整體轉換率</span><strong id="ovConversion">0%</strong><small class="metric-help">銷售訂單數 ÷ 非重複訪客數</small></article>
-          <article class="card stat"><span>推估營業額(TWD)</span><strong id="ovRevenue">0</strong></article>
-          <article class="card stat"><span>已收運費(TWD)</span><strong id="ovShipping">0</strong></article>
-          <article class="card stat"><span>PV / UV</span><strong id="ovPvUv">0</strong><small class="metric-help">PV ÷ UV：每位訪客平均瀏覽幾個頁面</small></article>
-          <article class="card stat"><span>客單價(TWD)</span><strong id="ovAov">0</strong><small class="metric-help">營業額 ÷ 銷售訂單數</small></article>
-          <article class="card stat"><span>UV 價值(TWD)</span><strong id="ovUvValue">0</strong><small class="metric-help">營業額 ÷ UV：每帶來一位訪客可產生多少營收</small></article>
-        </section>
-        <section class="overview-grid">
-          <article class="card chart-card"><h3>銷售趨勢</h3><canvas id="salesTrendChart"></canvas></article>
-          <article class="card chart-card chart-card-wide"><h3>銷售數量 Top 10</h3><canvas id="rankingChart"></canvas></article>
-        </section>
-        <section class="overview-grid extra-charts"><article class="card chart-card"><h3>流量趨勢</h3><canvas id="trafficTrendChart"></canvas><div id="trafficTrendNote" class="chart-note muted"></div></article><article class="card chart-card"><h3>平台營收占比</h3><canvas id="platformRevenueChart"></canvas></article></section>
-        <section class="card ranking-card">
-          <div class="section-head"><h3>商品銷售排行榜</h3><div><select id="rankingSort"><option value="units_desc">銷售數量：大到小</option><option value="units_asc">銷售數量：小到大</option><option value="revenue_desc">營業額：大到小</option><option value="revenue_asc">營業額：小到大</option><option value="orders_desc">訂單數：大到小</option><option value="price_desc">單價：大到小</option></select> <span id="rankingPeriod" class="muted"></span></div></div>
-          <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
-        </section>
-      </section>
-      <section id="pricingView" class="hidden overview-page">
-        <section class="card">
-          <div class="section-head"><div><h2>單件商品重新定價</h2><p class="muted">不修改商品主檔。以「客人只買 1 件」為基準試算。客收運費＝商品重量(kg) × 每公斤客收運費；若商品售價達「此表單免運門檻」則客收運費為 0。此處設定僅影響本試算頁，不會寫回系統參數。</p></div><div class="pricing-controls"><label>目標利潤率(%)<input id="pricingTargetRate" type="number" min="0" max="80" step="0.1" value="30"></label><label>此表單免運門檻(TWD)<input id="pricingFreeShippingTWD" type="number" min="0" step="1" value="5000"></label><input id="pricingSearch" type="search" placeholder="搜尋商品編號或名稱"><button id="pricingExportBtn" type="button" class="secondary">下載試算 Excel</button></div></div>
-          <div class="pricing-kpis"><article class="card stat"><span>目前平均利潤率</span><strong id="pricingAvgCurrentMargin">—</strong><small id="pricingAvgCurrentNote" class="muted">依目前篩選商品計算</small></article><article class="card stat"><span>參數調整後整體利潤率</span><strong id="pricingAdjustedOverallMargin">—</strong><small id="pricingAdjustedOverallNote" class="muted">依建議售價、目前篩選商品各 1 件彙總計算</small></article><article class="card stat"><span>目前篩選商品數</span><strong id="pricingVisibleCount">0</strong></article></div>
-          <div class="table-wrap"><table><thead><tr class="pricing-head-row"><th><div class="excel-header"><span>商品規格管理編號</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="spec">▼</button></div></th><th><div class="excel-header"><span>商品標題</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="title">▼</button></div></th><th><div class="excel-header"><span>日幣售價</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="priceJPY">▼</button></div></th><th><div class="excel-header"><span>重量(g)</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="weight">▼</button></div></th><th><div class="excel-header"><span>物流</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="method">▼</button></div></th><th><div class="excel-header"><span>單件物流成本</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="shipCost">▼</button></div></th><th><div class="excel-header"><span>客收運費</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="customer">▼</button></div></th><th><div class="excel-header"><span>目前售價</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="currentPrice">▼</button></div></th><th><div class="excel-header"><span>目前售價利潤率</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="margin">▼</button></div></th><th><div class="excel-header"><span>目標利潤建議售價</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="suggested">▼</button></div></th><th><div class="excel-header"><span>調整</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="diff">▼</button></div></th></tr></thead><tbody id="pricingTableBody"></tbody></table></div>
-        </section>
-        <section class="card">
-          <div class="section-head"><div><h2>多件訂單組合試算</h2><p class="muted">商品售價不重新計算；將所有商品重量合計後，只計算一次實際物流，檢查整張訂單利潤率。</p></div></div>
-          <div class="pricing-add-row"><input id="pricingSpecInput" type="text" placeholder="輸入商品規格管理編號"><input id="pricingQty" type="number" min="1" step="1" value="1"><button id="pricingAddBtn" type="button">加入試算</button><button id="pricingClearBtn" type="button" class="secondary">清空</button></div><div id="pricingAddMsg" class="muted"></div>
-          <div class="table-wrap"><table><thead><tr><th>商品</th><th>單價(TWD)</th><th>重量(g)</th><th>數量</th><th>小計</th><th></th></tr></thead><tbody id="pricingCartBody"></tbody></table></div>
-          <div id="pricingSummary" class="pricing-summary muted">請先加入商品。</div>
-        </section>
-      </section>
-      <section id="crossPlatformView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>商品跨平台</h2><div class="period-filter"><label>開始日期<input id="crossStart" type="date"></label><label>結束日期<input id="crossEnd" type="date"></label><label>平台<select id="crossPlatformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>已收運費</span><strong id="crossShipping">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead id="crossPlatformHead"></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>
-      <section id="platformCompareView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>平台比較</h2><div class="period-filter"><label>開始日期<input id="platformStart" type="date"></label><label>結束日期<input id="platformEnd" type="date"></label><label>平台<select id="platformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div id="platformDataStatus" class="muted overview-data-status"></div><div class="table-wrap"><table><thead id="platformCompareHead"></thead><tbody id="platformCompareBody"></tbody></table></div></section></section>
-
-      <section id="importView" class="hidden overview-page import-page">
-        <section class="card overview-toolbar">
-          <label>平台
-            <select id="importPlatform">
-              <option value="taiwan_rakuten">台灣樂天</option>
-              <option value="rianyou_shopify">日安優物 Shopline</option>
-            </select>
-          </label>
-          <label>開始日期<input id="salesImportStart" type="date"></label>
-          <label>結束日期<input id="salesImportEnd" type="date"></label>
-        </section>
-        <div class="import-grid">
-          <section class="card import-card import-card-wide">
-            <h2>上傳銷售 / 商品 CSV・Excel</h2>
-            <div class="import-controls">
-              <input id="excelFile" type="file" accept=".xlsx,.xls,.csv">
-              <select id="productImportStrategy" title="商品主檔匯入方式">
-                <option value="fast">快速建立商品主檔（10筆/批）</option>
-                <option value="full">完整更新模式（10筆/批）</option>
-              </select>
-              <select id="importMode">
-                <option value="upsert">相同規格編號：更新</option>
-                <option value="skip">相同規格編號：略過</option>
-              </select>
-              <button id="importBtn">匯入檔案</button>
-            </div>
-            <div class="import-rule-box">
-              <h3>台灣樂天｜全店訪問報告（獨立匯入）</h3>
-              <div class="import-controls">
-                <input id="rakutenWholeShopTrafficFile" type="file" accept=".xlsx,.xls,.csv" multiple>
-                <button id="importRakutenWholeShopTrafficBtn" type="button">匯入全店訪問報告</button>
-              </div>
-              <p class="muted">用途：全店流量（PV + UV）。系統先讀取【時間範圍】，再讀取【所有頁面檢視】與【所有非重複訪客】，並保存【全店頁面】【商品頁面】【店家類別頁面】【店家首頁】各自的 PV / UV。支援兩種【時間範圍】格式：① 2026/01/01 ~ 2026/07/31；② 2026/07 ~ 2026/07。若只有年月，系統會自動換算為該月第一天到最後一天，例如 2026/07 ~ 2026/07 → 2026-07-01 ~ 2026-07-31。單一報告仍只形成 1 個期間資料點；可一次選取多份不同期間報告形成流量趨勢。</p>
-            </div>
-            <div class="import-rule-box">
-              <h3>台灣樂天｜商品銷售數據（獨立匯入）</h3>
-              <div class="import-controls">
-                <input id="rakutenProductMetricsFile" type="file" accept=".xlsx,.xls,.csv">
-                <button id="importRakutenProductMetricsBtn" type="button">匯入商品銷售數據</button>
-              </div>
-              <p class="muted">依樂天實際表頭讀取：【商品管理編號 (Base SKU)】、【銷售】、【售出單位】、【訂單計數】、【頁面檢視】、【非重複訪客】、【轉換率】。系統會自動偵測真正的表頭列，不限定一定在 Excel 第 1 列；匯入前會直接顯示偵測到的【頁面檢視】欄、有效筆數與總和，避免資料被寫成 0。轉換率優先使用報表原值，空白時才使用「訂單計數 ÷ 頁面檢視」。</p>
-            </div>
-            <div class="import-rule-box">
-              <h3>台灣樂天｜訂單銷售報表讀取方式</h3>
-              <p class="muted">訂單號碼、訂單日期、顧客已付金額、運費、下載時的訂單狀態。此區負責唯一訂單、總營業額與已收運費；【銷售】【售出單位】【訂單計數】改由上方「商品銷售數據」獨立匯入。</p>
-              <p class="muted">以【訂單號碼】作為唯一訂單識別值：同一訂單即使在報表中有多個商品列，訂單數、顧客已付金額與運費都只計算一次；重複上傳同一訂單時會更新既有訂單，不會新增第二筆，因此不會重複計入營業額、已收運費或訂單數。「下載時的訂單狀態」為「已取消」的資料不列入任何統計。</p>
-            </div>
-            <div class="import-rule-box">
-              <h3>日安優物 Shopline｜銷售報表讀取方式</h3>
-              <p class="muted">訂單號碼 → 唯一訂單值；訂單日期 → 銷售日期；付款總金額 → 訂單營業額；運費 → 已收運費。</p>
-              <p class="muted">商品貨號 → 商品管理編號；商品結帳價格 → 商品層級營業額分配依據；數量 → 銷售商品數。</p>
-              <p class="muted">總營業額以訂單號碼去重後加總付款總金額，避免多商品訂單重複計算。</p>
-            </div>
-            <div class="import-rule-box">
-              <h3>商品主檔讀取方式</h3>
-              <p class="muted">商品規格管理編號、商品管理編號、商品標題、商品網址、RTWBase SKU、參考URL #1、價格等欄位。來源欄位【價格】會直接寫入【商品台幣售價(手動)】。此價格視為依目前【目標利潤率】制定的台幣售價，系統會依 Params 的平台費、商品成本匯率、日本國內運費、物流成本、客收運費與免運門檻等完整規則，反推【日幣售價(JPY)】，不再單純以台幣價格 ÷ 匯率換算。所有數值欄位在匯入時都會先自動轉成真正的 Number 再寫入 Firestore，即使來源 Excel 顯示「數字以文字儲存」也可讀取；支援例如 1,000、NT$1,000、￥5,000、全形數字等格式。商品編號、訂單號碼、SKU 等識別碼仍保留文字格式，避免前導 0 被吃掉。</p><p class="muted">快速建立模式只寫入商品識別、標題/規格、台幣價格、換算日幣價格、重量與網址等主檔必要資料；完整更新模式保留既有合併邏輯。匯入前會先做 1 筆 Firestore 寫入/刪除連線測試。</p>
-            </div>
-            <div id="importStatus" class="import-progress" role="status" aria-live="polite"></div>
-          </section>
-        </div>
-      </section>
-      </main>
+  <div class="card editor">
+    <h3>清除指定資料</h3>
+    <div class="maintenance-checks">
+      <label><input type="checkbox" class="maintenance-target" value="products"> 商品主檔</label>
+      <label><input type="checkbox" class="maintenance-target" value="sales"> 銷售資料</label>
+      <label><input type="checkbox" class="maintenance-target" value="ads"> 樂天廣告</label>
+      <label><input type="checkbox" class="maintenance-target" value="productAnalytics"> 商品分析</label>
+      <label><input type="checkbox" class="maintenance-target" value="imports"> 匯入紀錄</label>
+      <label><input type="checkbox" class="maintenance-target" value="platforms"> 平台資料</label>
     </div>
+    <button id="deleteSelectedBtn" class="danger">清除勾選項目</button>
+    <p id="maintenanceStatus" class="muted"></p>
   </div>
-
-  <dialog id="discountDialog">
-    <form method="dialog">
-      <div class="dialog-head"><h2>折扣後利潤試算</h2><button type="button" class="icon secondary" data-close="discountDialog">×</button></div>
-      <div class="discount-controls">
-        <label>折扣百分比（例如 20 代表 8 折）<input id="discountPercent" type="number" min="0" max="100" step="0.1" value="10"></label>
-        <button id="recalcDiscountBtn" type="button">重新計算</button>
-        <button id="exportDiscountBtn" type="button" class="secondary">匯出試算結果</button>
-      </div>
-      <div id="discountSummary" class="discount-summary"></div>
-      <div class="table-wrap discount-table-wrap"><table><thead><tr><th>商品規格管理編號</th><th>商品標題</th><th>原售價(TWD)</th><th>折扣後售價(TWD)</th><th>折扣後利潤(TWD)</th><th>折扣後利潤率</th></tr></thead><tbody id="discountTableBody"></tbody></table></div>
-      <p class="muted">本功能為試算，不會修改商品資料。折扣後售價會重新判斷台幣免運門檻、客收運費及平台費。</p>
-      <div class="dialog-actions"><button type="button" data-close="discountDialog">完成</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="productDialog">
-    <form id="productForm" method="dialog">
-      <div class="dialog-head"><h2 id="productDialogTitle">新增商品</h2><button type="button" class="icon secondary" data-close="productDialog">×</button></div>
-      <input id="productId" type="hidden" />
-      <div id="productFields" class="form-grid"></div>
-      <div class="dialog-actions"><button type="button" class="secondary" data-close="productDialog">取消</button><button id="saveProductBtn" type="submit">儲存</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="paramsDialog">
-    <form id="paramsForm" method="dialog">
-      <div class="dialog-head"><h2>計算參數</h2><button type="button" class="icon secondary" data-close="paramsDialog">×</button></div>
-      <p class="muted">修改後，沒有人工覆寫的計算欄位會依新參數重新計算。</p>
-      <div id="paramsFields" class="form-grid"></div>
-      <h3>新日誠物流級距</h3>
-      <div class="table-wrap small"><table><thead><tr><th>重量上限(kg)</th><th>運費(JPY)</th></tr></thead><tbody id="shippingTierBody"></tbody></table></div>
-      <div class="dialog-actions"><button type="button" class="secondary" data-close="paramsDialog">取消</button><button type="submit">儲存參數並重算</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="columnsDialog">
-    <form method="dialog">
-      <div class="dialog-head"><h2>選擇顯示欄位</h2><button type="button" class="icon secondary" data-close="columnsDialog">×</button></div>
-      <div id="columnOptions" class="checkbox-grid"></div>
-      <div class="dialog-actions"><button id="selectDefaultColumns" type="button" class="secondary">恢復預設</button><button type="button" data-close="columnsDialog">完成</button></div>
-    </form>
-  </dialog>
-
-
-  <dialog id="storesDialog">
-    <form method="dialog">
-      <div class="dialog-head"><h2>店鋪管理</h2><button type="button" class="icon secondary" data-close="storesDialog">×</button></div>
-      <p class="muted">匯入含「樂天編號、店家名／店鋪名、網址、運費」的 Excel。沒有個別運費時使用參數設定中的預設運費。</p>
-      <div class="toolbar-row import-row store-tools">
-        <input id="storeExcelFile" type="file" accept=".xlsx,.xls" />
-        <button id="storeImportBtn" type="button">匯入店鋪總表</button>
-        <button id="resyncStoresBtn" type="button" class="secondary">重新套用店鋪資料</button>
-        <span id="storeImportStatus" class="muted"></span>
-      </div>
-      <div class="toolbar-row store-tools"><input id="storeSearch" type="search" placeholder="搜尋店鋪編號、名稱或網址"><button id="addStoreBtn" type="button">＋ 新增店鋪</button><span id="storeCount" class="muted"></span></div>
-      <div class="table-wrap small"><table><thead><tr><th>店鋪編號</th><th>店鋪名</th><th>店鋪網址</th><th>運費(JPY)</th><th>操作</th></tr></thead><tbody id="storeTableBody"></tbody></table></div>
-    </form>
-  </dialog>
-
-  <dialog id="storeEditDialog">
-    <form id="storeForm" method="dialog">
-      <div class="dialog-head"><h2 id="storeFormTitle">新增店鋪</h2><button type="button" class="icon secondary" data-close="storeEditDialog">×</button></div>
-      <input id="storeId" type="hidden">
-      <div class="form-grid">
-        <label>店鋪編號<input id="storeCode" name="code" required placeholder="例如 R60"></label>
-        <label>店鋪名<input id="storeName" name="name"></label>
-        <label>日本國內運費(JPY)<input id="storeShipping" name="shippingJPY" type="number" min="0" step="1" required></label>
-        <label class="full-span">店鋪網址<input id="storeUrl" name="url" type="url" placeholder="https://..."></label>
-      </div>
-      <div class="dialog-actions"><button type="button" class="secondary" data-close="storeEditDialog">取消</button><button type="submit">儲存店鋪</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="maintenanceDialog">
-    <form method="dialog">
-      <div class="dialog-head"><h2>系統維護</h2><button type="button" class="icon secondary" data-close="maintenanceDialog">×</button></div>
-      <p class="muted">刪除作業不會刪除 Firebase Authentication 登入帳號。若 Firestore 中另有 users 或 roles 集合，也不會被「清空全部匯入資料」移除。</p>
-      <div id="maintenanceCounts" class="maintenance-list"></div>
-      <section class="health-box"><h3>商品對應健康檢查</h3><div class="health-grid"><span>銷售未對應<strong id="healthSales">0</strong></span><span>廣告未對應<strong id="healthAds">0</strong></span><span>商品分析未對應<strong id="healthAnalysis">0</strong></span></div></section>
-      <div class="maintenance-actions"><button id="resyncMaintenanceBtn" type="button" class="secondary">重新套用店鋪與運費</button><button id="rebuildIndexBtn" type="button" class="secondary">重建商品索引</button><button id="recalcDashboardBtn" type="button" class="secondary">Dashboard 重新計算</button><button id="healthCheckBtn" type="button" class="secondary">執行健康檢查</button></div>
-      <section class="danger-zone"><h3>刪除資料</h3><label>請輸入 <strong>DELETE</strong><input id="deleteConfirm" autocomplete="off" placeholder="DELETE"></label><div class="dialog-actions"><button id="deleteSelectedBtn" type="button" class="danger">刪除勾選資料</button><button id="clearAllBtn" type="button" class="danger">一鍵清空全部匯入資料</button></div></section>
-    </form>
-  </dialog>
-
-  <div id="toast" class="toast hidden"></div>
-  <script type="module" src="app.js"></script>
-</body>
-</html>
+  <div class="card editor danger-zone">
+    <h3>全部重建</h3>
+    <p>清空商品主檔、銷售資料、樂天廣告、商品分析、匯入紀錄及平台資料，保留帳號與權限。</p>
+    <button id="resetAllBtn" class="danger">清空全部匯入資料</button>
+  </div>
+  <div class="card editor">
+    <h3>重新載入與計算</h3>
+    <div class="header-actions"><button id="rebuildIndexBtn" class="ghost">重新建立商品索引</button><button id="recalculateBtn" class="ghost">重新計算 Dashboard</button></div>
+    <p class="muted">建議重新匯入順序：① 商品主檔 → ② 銷售 CSV → ③ 樂天廣告 → ④ 商品分析。</p>
+  </div>
+</section>
+<section id="history" class="page"><div class="card"><h3>匯入紀錄</h3><div class="table"><table><thead><tr><th>時間</th><th>類型</th><th>平台</th><th>檔案</th><th>讀取</th><th>寫入</th><th>跳過</th><th>匯入者</th></tr></thead><tbody id="historyRows"></tbody></table></div></div></section>
+</main></div><script type="module" src="app.js"></script></body></html>
