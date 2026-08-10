@@ -106,3 +106,7 @@ dialog{border-radius:12px}
 .pricing-head-row .excel-filter-button{flex:0 0 auto;}
 @media(max-width:900px){.pricing-kpis{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.pricing-kpis{grid-template-columns:1fr}}
+
+
+/* V1.2.33 商品分析 CSV 可視化讀取 / 寫入進度 */
+.file-progress{margin-top:12px;padding:12px 14px;border:1px solid #dbe5f0;border-radius:10px;background:#f8fbff}.file-progress.hidden{display:none}.file-progress-head{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:13px;color:#294869}.file-progress-head strong{font-variant-numeric:tabular-nums}.file-progress-track{height:9px;margin-top:9px;background:#e6edf5;border-radius:999px;overflow:hidden}.file-progress-bar{height:100%;background:linear-gradient(90deg,#4d7cff,#52a7ff);border-radius:999px;transition:width .18s ease}.file-progress-detail{margin-top:7px;min-height:17px;font-size:12px;color:#6b7a90;line-height:1.4}
