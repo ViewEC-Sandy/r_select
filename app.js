@@ -185,6 +185,29 @@ async function safeCollectionDocs(name){
     return [];
   }
 }
+
+function renderParams(){
+  const fields=$('paramsFields');
+  const tiers=$('shippingTierBody');
+  if(!fields||!tiers)return;
+
+  fields.innerHTML=PARAM_DEFS.map(([key,label])=>{
+    const value=params[key]??'';
+    const step=['productCostRate','platformFeeRate','targetProfitRate','nisshinRate','nisshinDiscount'].includes(key)?'0.001':'0.01';
+    return `<label>${esc(label)}
+      <input type="number" name="${esc(key)}" value="${esc(value)}" step="${step}">
+    </label>`;
+  }).join('');
+
+  const tierRows=Array.isArray(params.tiers)&&params.tiers.length?params.tiers:DEFAULT_PARAMS.tiers;
+  tiers.innerHTML=tierRows.map(([max,fee],i)=>`
+    <tr>
+      <td><input type="number" name="tierMax_${i}" value="${esc(max)}" step="0.01" min="0"></td>
+      <td><input type="number" name="tierFee_${i}" value="${esc(fee)}" step="1" min="0"></td>
+    </tr>
+  `).join('');
+}
+
 async function loadAll(){
   try{await ensurePlatforms()}catch(e){console.error('ensurePlatforms failed',e)}
   try{
