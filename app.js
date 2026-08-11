@@ -10,35 +10,54 @@ const db = getFirestore(app);
 const FIELDS = [
   ['specManagementId','商品規格管理編號','text','import'],['productManagementId','商品管理編號','text','import'],['title','商品標題','text','import'],
   ['spec1','規格1','text','import'],['spec2','規格2','text','import'],['spec3','規格3','text','import'],['note','備註','textarea','editable'],
-  ['taiwanUrl','台灣URL','url','import'],['japanUrl','日本URL','url','import'],['rtwBaseSku','RTWBase SKU','text','import'],['storeCode','店鋪編號','text','calculated'],['storeName','店鋪名','text','calculated'],
+  ['taiwanUrl','台灣樂天URL','url','import'],['rianyouUrl','日安URL','url','import'],['japanUrl','日本URL','url','import'],['rtwBaseSku','RTWBase SKU','text','import'],['storeCode','店鋪編號','text','calculated'],['storeName','店鋪名','text','calculated'],
   ['active','上架','boolean','editable'],['priceJPY','日幣售價(JPY)','number','editable'],['weightG','重量(g)','number','editable'],
   ['productCostTWD','商品成本(TWD)','number','calculated'],['domesticShippingJPY','日本國內運費(JPY)','number','calculated'],['domesticShippingTWD','日本國內運費(TWD)','number','calculated'],['logisticsMethod','物流方式','text','calculated'],
   ['uniCostTWD','統一成本(TWD)','number','calculated'],['nisshinCostTWD','新日誠成本(TWD)','number','calculated'],['fixedLogisticsCostTWD','固定規則物流成本(TWD)','number','calculated'],
-  ['manualPriceTWD','商品台幣售價(手動)','number','calculated'],['customerShippingTWD','客收運費(TWD)','number','calculated'],['grossReceivedTWD','原實收(TWD)','number','calculated'],
-  ['platformFeeTWD','平台費(TWD)','number','calculated'],['profitTWD','利潤(TWD)','number','calculated'],['profitRate','利潤率','percent','calculated'],
-  ['suggestedPrice30TWD','30%利潤建議售價(TWD)','number','calculated'],['pageViews','頁面檢視總數','number','import'],['unitsSold','銷售商品數','number','import'],
+  ['manualPriceTWD','樂天台幣售價','number','calculated'],['customerShippingTWD','樂天客收運費(TWD)','number','calculated'],['grossReceivedTWD','樂天原實收(TWD)','number','calculated'],
+  ['platformFeeTWD','樂天平台費(TWD)','number','calculated'],['profitTWD','樂天利潤(TWD)','number','calculated'],['profitRate','樂天利潤率','percent','calculated'],
+  ['suggestedPrice30TWD','樂天30%利潤建議售價(TWD)','number','calculated'],
+  ['rianyouPriceTWD','日安台幣售價','number','calculated'],['rianyouCustomerShippingTWD','日安客收運費(TWD)','number','calculated'],['rianyouGrossReceivedTWD','日安原實收(TWD)','number','calculated'],
+  ['rianyouPlatformFeeTWD','日安平台費(TWD)','number','calculated'],['rianyouProfitTWD','日安利潤(TWD)','number','calculated'],['rianyouProfitRate','日安利潤率','percent','calculated'],
+  ['rianyouSuggestedPrice30TWD','日安30%利潤建議售價(TWD)','number','calculated'],
+  ['pageViews','頁面檢視總數','number','import'],['unitsSold','銷售商品數','number','import'],
   ['orderCount','銷售訂單數','number','import'],['salesRevenueTWD','營業額(TWD)','number','calculated'],['shippingReceivedTWD','已收運費(TWD)','number','calculated'],['conversionRate','轉換率','percent','calculated']
 ];
 const FIELD_MAP = Object.fromEntries(FIELDS.map(f=>[f[0],{key:f[0],label:f[1],type:f[2],mode:f[3]}]));
 const IMPORT_ALIASES = {
   specManagementId:['商品規格管理編號','SKU','sku'], productManagementId:['商品管理編號','商品管理編號 (Base SKU)','商品管理編號(Base SKU)','Base SKU','商品編號'], title:['商品標題','商品名稱','商品名'],
-  spec1:['規格1'], spec2:['規格2'], spec3:['規格3'], note:['備註'], taiwanUrl:['商品網址','台灣URL','台灣網址'], japanUrl:['參考URL #1','參考URL#1','日本URL','日本網址'], rtwBaseSku:['RTWBase SKU','RTWBaseSKU'],
-  priceJPY:['日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','日本售價','日本價格','JPY價格'],
-  manualPriceTWD:['價格','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格'],
+  spec1:['規格1'], spec2:['規格2'], spec3:['規格3'], note:['備註'],
+  taiwanUrl:['商品網址','台灣URL','台灣網址','台灣樂天URL'],
+  rianyouUrl:['日安URL','日安優物URL','Shopline URL','Shopify URL'],
+  japanUrl:['參考URL #1','參考URL#1','日本URL','日本網址'], rtwBaseSku:['RTWBase SKU','RTWBaseSKU'],
+  priceJPY:['價格','日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','日本售價','日本價格','JPY價格'],
+  manualPriceTWD:['樂天台幣售價','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格'],
+  rianyouPriceTWD:['日安台幣售價','日安優物台幣售價','日安售價(TWD)'],
   weightG:['重量(g)','重量'], pageViews:['頁面檢視','頁面檢視總數','頁面檢視總數/月'],
   unitsSold:['售出單位','銷售商品數','銷售數'], orderCount:['訂單計數','銷售訂單數']
 };
-const DEFAULT_PARAMS = { productCostRate:.2, freeDomesticJPY:3980, domesticShippingJPY:800, platformFeeRate:.12, targetProfitRate:.3, customerShippingPerKgTWD:199, freeShippingTWD:5000, uniFirstKgTWD:205, uniEachHalfKgTWD:102.5, nisshinRate:.2, nisshinDiscount:.85, nisshinFixedFeeTWD:82, tiers:[[.5,1450],[.6,1600],[.7,1750],[.8,1900],[.9,2050],[1,2200],[1.25,2500],[1.5,2800],[1.75,3100],[2,3400],[2.5,3900],[3,4400],[3.5,4900],[4,5400],[4.5,5900],[5,6400],[5.5,6900],[6,7400],[7,8200],[8,9000],[9,9800],[10,10600],[11,11400],[12,12200],[13,13000]] };
-const PARAM_DEFS = [['productCostRate','商品成本匯率'],['freeDomesticJPY','日本國內免運門檻(JPY)'],['domesticShippingJPY','預設日本國內運費(JPY)'],['platformFeeRate','平台費率'],['targetProfitRate','目標利潤率'],['customerShippingPerKgTWD','客收運費/公斤(TWD)'],['freeShippingTWD','台幣免運門檻(TWD)'],['uniFirstKgTWD','統一數網首重1kg(TWD)'],['uniEachHalfKgTWD','統一數網續重0.5kg(TWD)'],['nisshinRate','新日誠物流匯率'],['nisshinDiscount','新日誠物流折扣'],['nisshinFixedFeeTWD','新日誠物流固定作業費(TWD)']];
+const DEFAULT_PARAMS = { productCostRate:.2, freeDomesticJPY:3980, domesticShippingJPY:800, platformFeeRate:.12, rianyouPlatformFeeRate:.04, targetProfitRate:.3, rianyouTargetProfitRate:.3, customerShippingPerKgTWD:199, freeShippingTWD:5000, rianyouFreeShippingTWD:5000, uniFirstKgTWD:205, uniEachHalfKgTWD:102.5, nisshinRate:.2, nisshinDiscount:.85, nisshinFixedFeeTWD:82, tiers:[[.5,1450],[.6,1600],[.7,1750],[.8,1900],[.9,2050],[1,2200],[1.25,2500],[1.5,2800],[1.75,3100],[2,3400],[2.5,3900],[3,4400],[3.5,4900],[4,5400],[4.5,5900],[5,6400],[5.5,6900],[6,7400],[7,8200],[8,9000],[9,9800],[10,10600],[11,11400],[12,12200],[13,13000]] };
+const PARAM_DEFS = [
+['productCostRate','商品成本匯率'],['freeDomesticJPY','日本國內免運門檻(JPY)'],['domesticShippingJPY','預設日本國內運費(JPY)'],
+['platformFeeRate','樂天平台費率'],['rianyouPlatformFeeRate','日安優物平台費率'],
+['targetProfitRate','樂天目標利潤率'],['rianyouTargetProfitRate','日安優物目標利潤率'],
+['customerShippingPerKgTWD','客收運費/公斤(TWD)'],
+['freeShippingTWD','樂天免運門檻(TWD)'],['rianyouFreeShippingTWD','日安優物免運門檻(TWD)'],
+['uniFirstKgTWD','統一數網首重1kg(TWD)'],['uniEachHalfKgTWD','統一數網續重0.5kg(TWD)'],['nisshinRate','新日誠物流匯率'],['nisshinDiscount','新日誠物流折扣'],['nisshinFixedFeeTWD','新日誠物流固定作業費(TWD)']
+];
 const PLATFORMS=[{id:'taiwan_rakuten',name:'台灣樂天'},{id:'rianyou_shopify',name:'日安優物 Shopline'}];
 const MAINT_COLLECTIONS={products:'商品主檔',sales:'銷售',orders:'唯一訂單',trafficReports:'全店訪問報告',imports:'匯入紀錄',platforms:'平台資料',stores:'店鋪資料'};
-const DEFAULT_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','japanUrl','active','priceJPY','domesticShippingJPY','domesticShippingTWD','weightG','manualPriceTWD','profitTWD','profitRate'];
-const SALES_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','japanUrl','active','pageViews','unitsSold','orderCount','salesRevenueTWD','shippingReceivedTWD','conversionRate','manualPriceTWD','profitTWD','profitRate'];
+const DEFAULT_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','rianyouUrl','japanUrl','active','priceJPY','domesticShippingJPY','domesticShippingTWD','weightG','manualPriceTWD','profitTWD','profitRate','rianyouPriceTWD','rianyouProfitTWD','rianyouProfitRate'];
+const SALES_COLUMNS=['specManagementId','productManagementId','title','storeCode','taiwanUrl','rianyouUrl','japanUrl','active','pageViews','unitsSold','orderCount','salesRevenueTWD','shippingReceivedTWD','conversionRate','manualPriceTWD','profitTWD','profitRate','rianyouPriceTWD','rianyouProfitTWD','rianyouProfitRate'];
 let products=[], stores=[], salesHistory=[], ordersHistory=[], trafficHistory=[], storeMap=new Map(), params={...DEFAULT_PARAMS}, visibleColumns=JSON.parse(localStorage.getItem('visibleColumns')||'null')||DEFAULT_COLUMNS, salesVisibleColumns=JSON.parse(localStorage.getItem('salesVisibleColumns')||'null')||SALES_COLUMNS, page=1; const PAGE_SIZE=50;
 let currentView='products', selectedProductIds=new Set(), discountResults=[], salesTrendChart=null, rankingChart=null, trafficTrendChart=null, platformRevenueChart=null;
 let crossSort={key:'revenue',direction:'desc'}, platformSort={key:'revenue',direction:'desc'};
-const CROSS_COLUMN_DEFS=[['spec','商品規格管理編號'],['base','商品管理編號'],['title','商品名'],['platform','平台'],['revenue','營業額'],['shipping','已收運費'],['units','銷量'],['orders','訂單數']];
+const CROSS_COLUMN_DEFS=[['spec','商品規格管理編號'],['base','商品管理編號'],['title','商品名'],['platform','平台'],['revenue','營業額'],['shipping','已收運費'],['units','銷量'],['orders','訂單數'],['rakutenPrice','樂天台幣售價'],['rakutenProfit','樂天利潤(TWD)'],['rakutenMargin','樂天利潤率'],['rianyouPrice','日安台幣售價'],['rianyouProfit','日安利潤(TWD)'],['rianyouMargin','日安利潤率']];
 let crossVisibleColumns=JSON.parse(localStorage.getItem('crossVisibleColumns')||'null')||CROSS_COLUMN_DEFS.map(x=>x[0]);
+visibleColumns=[...new Set([...visibleColumns,'rianyouUrl','rianyouPriceTWD','rianyouProfitTWD','rianyouProfitRate'])];
+salesVisibleColumns=[...new Set([...salesVisibleColumns,'rianyouUrl','rianyouPriceTWD','rianyouProfitTWD','rianyouProfitRate'])];
+crossVisibleColumns=[...new Set([...crossVisibleColumns,'rakutenPrice','rakutenProfit','rakutenMargin','rianyouPrice','rianyouProfit','rianyouMargin'])];
+
 let sortState={key:'',direction:'asc'}, columnFilters={}, activeFilterKey='';
 let productFormOriginal=null, productFormManualOverrides=new Set();
 const $=id=>document.getElementById(id); const n=v=>Number(v)||0; const round=v=>Math.round(v); const ceilKg=g=>Math.ceil(n(g)/1000);
@@ -102,10 +121,29 @@ function cleanNumber(v){
 function validUrl(v){const s=cleanText(v);if(!s)return '';try{return new URL(s).href}catch{return /^www\./i.test(s)?`https://${s}`:''}}
 function extractStoreCode(...values){for(const value of values){const s=cleanText(value).toUpperCase();const m=s.match(/(?:^|[^A-Z0-9])(R\d{1,4})(?=[^A-Z0-9]|$)/i)||s.match(/^(R\d{1,4})/i);if(m)return m[1].toUpperCase()}return ''}
 function getStore(base){const code=extractStoreCode(base.storeCode,base.productManagementId,base.specManagementId);return code?storeMap.get(code):null}
+function calcSuggestedPlatform(j,k,o,weight,feeRate,targetRate,freeShippingTWD){
+  if(j===null||j===undefined||k===null||k===undefined||typeof o!=='number')return null;
+  const target=n(targetRate),denom=1-n(feeRate)-target;if(denom<=0)return null;
+  const ship=ceilKg(weight)*params.customerShippingPerKgTWD;
+  const candidate=((n(j)+n(k)+n(o))-ship*(1-target))/denom;
+  return round(candidate>=n(freeShippingTWD)?(n(j)+n(k)+n(o))/denom:candidate);
+}
+function platformFinancial(salePrice,weight,productCost,domestic,fixed,feeRate,targetRate,freeShippingTWD){
+  const suggested=calcSuggestedPlatform(productCost,domestic,fixed,weight,feeRate,targetRate,freeShippingTWD);
+  const sale=salePrice!==null&&salePrice!==undefined&&Number.isFinite(Number(salePrice))?n(salePrice):suggested;
+  if(sale===null||sale===undefined)return {sale:null,suggested,customer:null,gross:null,fee:null,profit:null,margin:null};
+  const customer=sale>=n(freeShippingTWD)?0:ceilKg(weight)*params.customerShippingPerKgTWD;
+  const gross=sale+customer;
+  const fee=sale*n(feeRate);
+  const profit=typeof fixed==='number'?gross-fee-fixed-n(productCost)-n(domestic):null;
+  return {sale,suggested,customer,gross,fee,profit,margin:gross&&profit!==null?profit/gross:null};
+}
 function compute(base){
-  const p={...base}, ov=p.overrides||{}, price=n(p.priceJPY), weight=n(p.weightG), store=getStore(p);
+  const p={...base},ov=p.overrides||{},price=n(p.priceJPY),weight=n(p.weightG),store=getStore(p);
   const storeCode=store?.code||extractStoreCode(p.storeCode,p.productManagementId,p.specManagementId);
   const storeName=store?.name||p.storeName||'';
+  const taiwanUrl=validUrl(p.taiwanUrl)||'';
+  const rianyouUrl=validUrl(p.rianyouUrl)||'';
   const japanUrl=validUrl(p.japanUrl)||'';
 
   const autoProductCost=price?price*params.productCostRate:null;
@@ -120,30 +158,40 @@ function compute(base){
   const uni=ov.uniCostTWD?n(p.uniCostTWD):autoUni;
 
   let autoNisshin=null;
-  if(weight){const kg=weight/1000;if(kg>13)autoNisshin='超重';else{const tier=params.tiers.find(([max])=>kg<=max);autoNisshin=tier?round(tier[1]*params.nisshinRate*params.nisshinDiscount+params.nisshinFixedFeeTWD):null}}
+  if(weight){
+    const kg=weight/1000;
+    if(kg>13)autoNisshin='超重';
+    else{
+      const tier=params.tiers.find(([max])=>kg<=max);
+      autoNisshin=tier?round(tier[1]*params.nisshinRate*params.nisshinDiscount+params.nisshinFixedFeeTWD):null;
+    }
+  }
   const nisshin=ov.nisshinCostTWD?n(p.nisshinCostTWD):autoNisshin;
-
   const autoFixed=method==='統一'?uni:nisshin;
   const fixed=ov.fixedLogisticsCostTWD?n(p.fixedLogisticsCostTWD):autoFixed;
 
-  const autoSuggested=price?calcSuggested(productCost,domestic,fixed,weight):null;
-  const suggested=ov.suggestedPrice30TWD?n(p.suggestedPrice30TWD):autoSuggested;
-  const manual=ov.manualPriceTWD?n(p.manualPriceTWD):suggested;
-  const autoCustomer=manual!==null?(manual>=params.freeShippingTWD?0:ceilKg(weight)*params.customerShippingPerKgTWD):null;
-  const customer=ov.customerShippingTWD?n(p.customerShippingTWD):autoCustomer;
-  const autoGross=manual!==null?manual+customer:null;
-  const gross=ov.grossReceivedTWD?n(p.grossReceivedTWD):autoGross;
-  const autoFee=manual!==null?manual*params.platformFeeRate:null;
-  const fee=ov.platformFeeTWD?n(p.platformFeeTWD):autoFee;
-  const autoProfit=gross!==null&&typeof fixed==='number'?gross-fee-fixed-productCost-domestic:null;
-  const profit=ov.profitTWD?n(p.profitTWD):autoProfit;
-  const autoMargin=gross?profit/gross:null;
-  const margin=ov.profitRate?n(p.profitRate):autoMargin;
+  const rakuten=platformFinancial(
+    ov.manualPriceTWD?n(p.manualPriceTWD):null,weight,productCost,domestic,fixed,
+    params.platformFeeRate,params.targetProfitRate,params.freeShippingTWD
+  );
+  const rianyou=platformFinancial(
+    ov.rianyouPriceTWD?n(p.rianyouPriceTWD):null,weight,productCost,domestic,fixed,
+    params.rianyouPlatformFeeRate,params.rianyouTargetProfitRate,params.rianyouFreeShippingTWD
+  );
+
   const conversion=n(p.pageViews)>0?n(p.orderCount)/n(p.pageViews):null;
-  const values={storeCode,storeName,japanUrl,productCostTWD:productCost,domesticShippingJPY:domesticJPY,domesticShippingTWD:domestic,logisticsMethod:method,uniCostTWD:uni,nisshinCostTWD:nisshin,fixedLogisticsCostTWD:fixed,manualPriceTWD:manual,customerShippingTWD:customer,grossReceivedTWD:gross,platformFeeTWD:fee,profitTWD:profit,profitRate:margin,suggestedPrice30TWD:suggested,conversionRate:conversion};
-  return {...p,...values};
+  return {...p,
+    storeCode,storeName,taiwanUrl,rianyouUrl,japanUrl,
+    productCostTWD:productCost,domesticShippingJPY:domesticJPY,domesticShippingTWD:domestic,
+    logisticsMethod:method,uniCostTWD:uni,nisshinCostTWD:nisshin,fixedLogisticsCostTWD:fixed,
+    manualPriceTWD:rakuten.sale,customerShippingTWD:rakuten.customer,grossReceivedTWD:rakuten.gross,
+    platformFeeTWD:rakuten.fee,profitTWD:rakuten.profit,profitRate:rakuten.margin,suggestedPrice30TWD:rakuten.suggested,
+    rianyouPriceTWD:rianyou.sale,rianyouCustomerShippingTWD:rianyou.customer,rianyouGrossReceivedTWD:rianyou.gross,
+    rianyouPlatformFeeTWD:rianyou.fee,rianyouProfitTWD:rianyou.profit,rianyouProfitRate:rianyou.margin,rianyouSuggestedPrice30TWD:rianyou.suggested,
+    conversionRate:conversion
+  };
 }
-function calcSuggested(j,k,o,weight){const target=params.targetProfitRate,denom=1-params.platformFeeRate-target;if(denom<=0)return null;const ship=ceilKg(weight)*params.customerShippingPerKgTWD;const candidate=((n(j)+n(k)+n(o))-ship*(1-target))/denom;return round(candidate>=params.freeShippingTWD?(n(j)+n(k)+n(o))/denom:candidate)}
+function calcSuggested(j,k,o,weight){return calcSuggestedPlatform(j,k,o,weight,params.platformFeeRate,params.targetProfitRate,params.freeShippingTWD)}
 function reverseJPYFromTargetTWD(targetPriceTWD,weight,store){
   const manual=Number(targetPriceTWD), rate=Number(params.productCostRate), target=Number(params.targetProfitRate);
   if(!Number.isFinite(manual)||manual<=0||!Number.isFinite(rate)||rate<=0)return null;
@@ -193,7 +241,7 @@ function renderParams(){
 
   fields.innerHTML=PARAM_DEFS.map(([key,label])=>{
     const value=params[key]??'';
-    const step=['productCostRate','platformFeeRate','targetProfitRate','nisshinRate','nisshinDiscount'].includes(key)?'0.001':'0.01';
+    const step=['productCostRate','platformFeeRate','rianyouPlatformFeeRate','targetProfitRate','rianyouTargetProfitRate','nisshinRate','nisshinDiscount'].includes(key)?'0.001':'0.01';
     return `<label>${esc(label)}
       <input type="number" name="${esc(key)}" value="${esc(value)}" step="${step}">
     </label>`;
@@ -261,7 +309,7 @@ function filtered(){
   if(sortState.key)list.sort((a,b)=>compareValues(a,b,sortState.key)*(sortState.direction==='asc'?1:-1));
   return list;
 }
-function renderAll(){renderTable();const list=filtered();$('statProducts').textContent=formatInteger(list.length);$('statActive').textContent=formatInteger(list.filter(p=>p.active).length);const margins=list.map(p=>p.profitRate).filter(Number.isFinite);$('statMargin').textContent=margins.length?(margins.reduce((a,b)=>a+b,0)/margins.length*100).toFixed(1)+'%':'0%';$('statUnits').textContent=formatInteger(list.reduce((s,p)=>s+n(p.unitsSold),0));if($('statRevenue')){
+function renderAll(){renderTable();const list=filtered();$('statProducts').textContent=formatInteger(list.length);$('statActive').textContent=formatInteger(list.filter(p=>p.active).length);const margins=list.map(p=>p.profitRate).filter(Number.isFinite);$('statMargin').textContent=margins.length?(margins.reduce((a,b)=>a+b,0)/margins.length*100).toFixed(1)+'%':'0%';const rianMargins=list.map(p=>p.rianyouProfitRate).filter(Number.isFinite);if($('statRianyouMargin'))$('statRianyouMargin').textContent=rianMargins.length?(rianMargins.reduce((a,b)=>a+b,0)/rianMargins.length*100).toFixed(1)+'%':'0%';$('statUnits').textContent=formatInteger(list.reduce((s,p)=>s+n(p.unitsSold),0));if($('statRevenue')){
   if(currentView==='sales'){
     const s=$('salesFilterStart')?.value||'',e=$('salesFilterEnd')?.value||'';
     const totals=orderTotalsForRange(s,e,'all');
@@ -351,10 +399,10 @@ async function saveProduct(form){
   const fd=new FormData(form),id=$('productId').value,old=id?products.find(p=>p.id===id):{};const data={...old,overrides:{}};
   productFormManualOverrides.forEach(k=>data.overrides[k]=true);
   FIELDS.forEach(([k,,t])=>{if(['conversionRate','storeCode','storeName','domesticShippingJPY'].includes(k))return;const raw=fd.get(k);if(raw===null)return;data[k]=t==='number'||t==='percent'?(raw===''?null:Number(raw)):t==='boolean'?raw==='true':String(raw)});
-  data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);data.platformData={};PLATFORMS.forEach(x=>{data.platformData[x.id]={enabled:fd.get(`platform_${x.id}_enabled`)==='on',price:fd.get(`platform_${x.id}_price`)===''?null:Number(fd.get(`platform_${x.id}_price`)),active:fd.get(`platform_${x.id}_active`)==='true',note:String(fd.get(`platform_${x.id}_note`)||'')}});data.title=String(data.title||'').slice(0,100);data.updatedAt=serverTimestamp();if(!id)data.createdAt=serverTimestamp();const ref=id?doc(db,'products',id):doc(collection(db,'products'));await setDoc(ref,data,{merge:true});toast('商品已儲存');$('productDialog').close();await loadAll()
+  data.taiwanUrl=validUrl(data.taiwanUrl);data.rianyouUrl=validUrl(data.rianyouUrl);data.japanUrl=validUrl(data.japanUrl);data.platformData={};PLATFORMS.forEach(x=>{data.platformData[x.id]={enabled:fd.get(`platform_${x.id}_enabled`)==='on',price:fd.get(`platform_${x.id}_price`)===''?null:Number(fd.get(`platform_${x.id}_price`)),active:fd.get(`platform_${x.id}_active`)==='true',note:String(fd.get(`platform_${x.id}_note`)||'')}});data.title=String(data.title||'').slice(0,100);data.updatedAt=serverTimestamp();if(!id)data.createdAt=serverTimestamp();const ref=id?doc(db,'products',id):doc(collection(db,'products'));await setDoc(ref,data,{merge:true});toast('商品已儲存');$('productDialog').close();await loadAll()
 }
 function findHeader(row,aliases){const normalized=Object.fromEntries(Object.keys(row).map(k=>[cleanHeader(k),k]));for(const a of aliases){const hit=normalized[cleanHeader(a)];if(hit!==undefined)return hit}return null}
-function normalizeImportRows(rows){let parent={productManagementId:'',title:'',note:'',taiwanUrl:'',japanUrl:'',rtwBaseSku:''};return rows.map(row=>{const data={};for(const [key,aliases] of Object.entries(IMPORT_ALIASES)){const h=findHeader(row,aliases);if(h!==null)data[key]=row[h]}for(const k of Object.keys(data))data[k]=typeof data[k]==='string'?cleanText(data[k]):data[k];for(const k of ['productManagementId','title','note','taiwanUrl','japanUrl','rtwBaseSku']){if(cleanText(data[k]))parent[k]=data[k];else data[k]=parent[k]}data.specManagementId=cleanText(data.specManagementId);data.productManagementId=cleanText(data.productManagementId);data.taiwanUrl=validUrl(data.taiwanUrl);data.japanUrl=validUrl(data.japanUrl);return data}).filter(r=>r.specManagementId)}
+function normalizeImportRows(rows){let parent={productManagementId:'',title:'',note:'',taiwanUrl:'',rianyouUrl:'',japanUrl:'',rtwBaseSku:''};return rows.map(row=>{const data={};for(const [key,aliases] of Object.entries(IMPORT_ALIASES)){const h=findHeader(row,aliases);if(h!==null)data[key]=row[h]}for(const k of Object.keys(data))data[k]=typeof data[k]==='string'?cleanText(data[k]):data[k];for(const k of ['productManagementId','title','note','taiwanUrl','rianyouUrl','japanUrl','rtwBaseSku']){if(cleanText(data[k]))parent[k]=data[k];else data[k]=parent[k]}data.specManagementId=cleanText(data.specManagementId);data.productManagementId=cleanText(data.productManagementId);data.taiwanUrl=validUrl(data.taiwanUrl);data.rianyouUrl=validUrl(data.rianyouUrl);data.japanUrl=validUrl(data.japanUrl);return data}).filter(r=>r.specManagementId)}
 async function exportProducts(){const rows=products.map(p=>{const r={};FIELDS.forEach(([k,l])=>r[l]=p[k]??'');PLATFORMS.forEach(x=>{const d=p.platformData?.[x.id]||{};r[`${x.name}-啟用`]=!!d.enabled;r[`${x.name}-售價`]=d.price??'';r[`${x.name}-上架`]=d.active!==false;r[`${x.name}-備註`]=d.note??''});return r});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'商品主檔');XLSX.writeFile(wb,`商品資料庫_${new Date().toISOString().slice(0,10)}.xlsx`)}
 function normalizeImportHeader(v){
   return String(v??'')
@@ -367,7 +415,7 @@ function normalizeImportHeader(v){
 }
 function normalizeImportedNumericFields(row){
   const numericHeaders=[
-    '價格','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格',
+    '價格','樂天台幣售價','日安台幣售價','日安優物台幣售價','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格',
     '日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','日本售價','日本價格','JPY價格',
     '重量(g)','重量',
     '頁面檢視','頁面檢視總數','非重複訪客','不重複訪客','轉換率','售出單位','銷售商品數','銷售數','數量','訂單計數','銷售訂單數','銷售',
@@ -807,11 +855,13 @@ const PARTIAL_PRODUCT_UPDATE_FIELDS=[
   {key:'spec2',aliases:['規格2'],type:'text',label:'規格2'},
   {key:'spec3',aliases:['規格3'],type:'text',label:'規格3'},
   {key:'note',aliases:['備註'],type:'text',label:'備註'},
-  {key:'taiwanUrl',aliases:['商品網址','台灣URL','台灣網址'],type:'url',label:'台灣URL'},
+  {key:'taiwanUrl',aliases:['商品網址','台灣URL','台灣網址','台灣樂天URL'],type:'url',label:'台灣樂天URL'},
+  {key:'rianyouUrl',aliases:['日安URL','日安優物URL','Shopline URL','Shopify URL'],type:'url',label:'日安URL'},
   {key:'japanUrl',aliases:['參考URL #1','參考URL#1','日本URL','日本網址'],type:'url',label:'日本URL'},
   {key:'rtwBaseSku',aliases:['RTWBase SKU','RTWBaseSKU'],type:'text',label:'RTWBase SKU'},
-  {key:'manualPriceTWD',aliases:['價格','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格'],type:'number',label:'商品台幣售價'},
-  {key:'priceJPY',aliases:['日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','日本售價','日本價格','JPY價格'],type:'number',label:'日幣售價'},
+  {key:'priceJPY',aliases:['價格','日幣售價(JPY)','日幣售價','日幣售價 (JPY)','售價(JPY)','售價 (JPY)','日本售價','日本價格','JPY價格'],type:'number',label:'日幣售價(JPY)'},
+  {key:'manualPriceTWD',aliases:['樂天台幣售價','商品台幣售價(手動)','商品台幣售價','台幣售價','售價(TWD)','售價 (TWD)','TWD價格'],type:'number',label:'樂天台幣售價'},
+  {key:'rianyouPriceTWD',aliases:['日安台幣售價','日安優物台幣售價','日安售價(TWD)'],type:'number',label:'日安台幣售價'},
   {key:'weightG',aliases:['重量(g)','重量'],type:'number',label:'重量'},
   {key:'active',aliases:['上架','上架狀態','active'],type:'boolean',label:'上架'},
   {key:'pageViews',aliases:['頁面檢視','頁面檢視總數','頁面檢視總數/月'],type:'number',label:'頁面檢視'},
@@ -924,17 +974,17 @@ async function importPartialProductUpdate(raw,file,selectedPlatform){
 
     if(!changed){blankSkipped++;continue}
 
-    // 台幣售價有更新時，依目前 Params 的完整模型同步反推日幣售價；
-    // 若 CSV 同時明確提供日幣售價，則以 CSV 的日幣售價為準。
-    if(Object.prototype.hasOwnProperty.call(patch,'manualPriceTWD')){
-      const mergedForCalc={...old,...patch};
-      patch.priceJPY=reverseJPYFromTargetTWD(patch.manualPriceTWD,mergedForCalc.weightG,getStore(mergedForCalc));
-      patch.overrides={...(old.overrides||{}),manualPriceTWD:true};
+    // V1.3：日幣金額是來源，不再從台幣售價反推日幣。
+    // 更新日幣金額後，清除兩平台售價的自動計算覆寫，讓系統依各平台 Params 重新試算；
+    // 若 CSV 明確提供某平台台幣售價，則該平台保留手動覆寫。
+    const nextOverrides={...(old.overrides||{})};
+    if(Object.prototype.hasOwnProperty.call(patch,'priceJPY')){
+      delete nextOverrides.manualPriceTWD;
+      delete nextOverrides.rianyouPriceTWD;
     }
-    const explicitJPY=partialRawValue(row,PARTIAL_PRODUCT_UPDATE_FIELDS.find(x=>x.key==='priceJPY').aliases);
-    if(explicitJPY!==''&&cleanNumber(explicitJPY)!==null){
-      patch.priceJPY=cleanNumber(explicitJPY);
-    }
+    if(Object.prototype.hasOwnProperty.call(patch,'manualPriceTWD'))nextOverrides.manualPriceTWD=true;
+    if(Object.prototype.hasOwnProperty.call(patch,'rianyouPriceTWD'))nextOverrides.rianyouPriceTWD=true;
+    patch.overrides=nextOverrides;
 
     updates.push({ref:doc(db,'products',old.id),data:{...patch,updatedAt:serverTimestamp()}});
   }
@@ -1074,7 +1124,7 @@ async function importExcel(){
     const rows=normalizeImportRows(raw);
     if(!rows.length)throw new Error('找不到有效的商品規格管理編號');
 
-    const detectedPriceHeader=raw.length?(findHeader(raw[0],IMPORT_ALIASES.manualPriceTWD)||findHeader(raw[0],IMPORT_ALIASES.priceJPY)):null;
+    const detectedPriceHeader=raw.length?(findHeader(raw[0],IMPORT_ALIASES.priceJPY)||findHeader(raw[0],IMPORT_ALIASES.manualPriceTWD)):null;
     const existing=new Map(
       products
         .filter(p=>p.specManagementId)
@@ -1118,16 +1168,13 @@ async function importExcel(){
           ...row
         };
 
-        data.manualPriceTWD=cleanNumber(data.manualPriceTWD);
+        // V1.3：來源【價格】視為日幣金額，直接寫入【日幣售價(JPY)】。
+        // 系統再以商品成本匯率換算商品成本(TWD)，並依各平台費率／目標利潤率／免運門檻分別計算售價與利潤。
         data.priceJPY=cleanNumber(data.priceJPY);
-
-        // 來源欄位「價格」是已依目標利潤率制定的台幣售價。
-        // 不直接除以匯率；改用目前 Params 的完整利潤模型反推日幣價格。
-        if(data.manualPriceTWD!==null&&Number.isFinite(Number(data.manualPriceTWD))){
-          const importStore=getStore(data);
-          data.priceJPY=reverseJPYFromTargetTWD(data.manualPriceTWD,data.weightG,importStore);
-          data.overrides={...(data.overrides||{}),manualPriceTWD:true};
-        }
+        data.manualPriceTWD=cleanNumber(data.manualPriceTWD);
+        data.rianyouPriceTWD=cleanNumber(data.rianyouPriceTWD);
+        if(data.manualPriceTWD!==null)data.overrides={...(data.overrides||{}),manualPriceTWD:true};
+        if(data.rianyouPriceTWD!==null)data.overrides={...(data.overrides||{}),rianyouPriceTWD:true};
 
         data.weightG=cleanNumber(data.weightG);
         data.pageViews=n(cleanNumber(data.pageViews));
@@ -1137,6 +1184,14 @@ async function importExcel(){
         const key=cleanText(data.specManagementId);
         const old=existing.get(key);
 
+        // V1.3.1：既有 Firestore 的樂天台幣售價是目前前台實際售價，標準商品主檔匯入不得覆蓋。
+        // 來源【價格】只更新日幣售價(JPY)；舊 manualPriceTWD 原值完整保留。
+        const existingRakutenManualPrice=old?cleanNumber(old.manualPriceTWD):null;
+        if(old&&existingRakutenManualPrice!==null){
+          data.manualPriceTWD=existingRakutenManualPrice;
+          data.overrides={...(data.overrides||{}),manualPriceTWD:true};
+        }
+
         if(old&&$('importMode').value==='skip'){
           skipped++;
           continue;
@@ -1144,30 +1199,48 @@ async function importExcel(){
 
         let ref,merged;
         if(importStrategy==='fast'){
-          // 快速建立：固定 document ID，避免先查詢/比對大量文件；只寫商品主檔必要欄位。
+          // 快速建立：新商品使用固定 document ID；若商品已存在則沿用原 document，
+          // 並保留既有樂天台幣售價與其手動覆蓋旗標。
           const safeId=encodeURIComponent(key).replace(/%/g,'_').slice(0,1400);
-          ref=doc(db,'products',`sku_${safeId}`);
+          ref=old?doc(db,'products',old.id):doc(db,'products',`sku_${safeId}`);
           merged={
-            specManagementId:data.specManagementId||'',
-            productManagementId:data.productManagementId||'',
-            title:data.title||'',
-            spec1:data.spec1||'', spec2:data.spec2||'', spec3:data.spec3||'',
-            note:data.note||'', active:true,
-            manualPriceTWD:data.manualPriceTWD??null,
-            priceJPY:data.priceJPY??null,
-            weightG:data.weightG??null,
-            taiwanUrl:data.taiwanUrl||'', japanUrl:data.japanUrl||'',
-            rtwBaseSku:data.rtwBaseSku||'',
-            overrides:{manualPriceTWD:data.manualPriceTWD!==null},
-            platformData:{[selectedPlatform]:{enabled:true,active:true,price:null,note:''}},
+            ...(old||{}),
+            specManagementId:data.specManagementId||old?.specManagementId||'',
+            productManagementId:data.productManagementId||old?.productManagementId||'',
+            title:data.title||old?.title||'',
+            spec1:data.spec1||old?.spec1||'', spec2:data.spec2||old?.spec2||'', spec3:data.spec3||old?.spec3||'',
+            note:data.note||old?.note||'', active:old?.active??true,
+            manualPriceTWD:existingRakutenManualPrice!==null?existingRakutenManualPrice:(data.manualPriceTWD??null),
+            rianyouPriceTWD:data.rianyouPriceTWD??old?.rianyouPriceTWD??null,
+            priceJPY:data.priceJPY??old?.priceJPY??null,
+            weightG:data.weightG??old?.weightG??null,
+            taiwanUrl:data.taiwanUrl||old?.taiwanUrl||'',
+            rianyouUrl:data.rianyouUrl||old?.rianyouUrl||'',
+            japanUrl:data.japanUrl||old?.japanUrl||'',
+            rtwBaseSku:data.rtwBaseSku||old?.rtwBaseSku||'',
+            overrides:{
+              ...(old?.overrides||{}),
+              manualPriceTWD:existingRakutenManualPrice!==null?true:(data.manualPriceTWD!==null),
+              rianyouPriceTWD:data.rianyouPriceTWD!==null||(old?.overrides?.rianyouPriceTWD===true)
+            },
+            platformData:{...(old?.platformData||{}),[selectedPlatform]:{enabled:true,active:true,price:null,note:''}},
             updatedAt:serverTimestamp()
           };
         }else{
           ref=old?doc(db,'products',old.id):doc(collection(db,'products'));
           merged=old
             ? {
-                ...data, active:old.active??true, note:data.note||old.note||'',
-                overrides:{...(old.overrides||{}),...(data.overrides||{})},
+                ...old,
+                ...data,
+                active:old.active??true,
+                note:data.note||old.note||'',
+                // 標準匯入只更新日幣售價等來源欄位；既有樂天前台售價永遠保留。
+                manualPriceTWD:existingRakutenManualPrice!==null?existingRakutenManualPrice:(data.manualPriceTWD??old.manualPriceTWD??null),
+                overrides:{
+                  ...(old.overrides||{}),
+                  ...(data.overrides||{}),
+                  manualPriceTWD:existingRakutenManualPrice!==null?true:((data.overrides||{}).manualPriceTWD===true||(old.overrides||{}).manualPriceTWD===true)
+                },
                 platformData:{...(old.platformData||{}),...(data.platformData||{})},
                 updatedAt:serverTimestamp()
               }
@@ -1464,15 +1537,15 @@ function renderOverview(){
   if(platformRevenueChart)platformRevenueChart.destroy();const pLabels=[...byPlatform.keys()].map(x=>PLATFORMS.find(p=>p.id===x)?.name||x);platformRevenueChart=new Chart($('platformRevenueChart'),{type:'doughnut',data:{labels:pLabels,datasets:[{data:[...byPlatform.values()]}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%'}});
 }
 function rowsForSection(startId,endId,platformId){const start=$(startId)?.value||'',end=$(endId)?.value||'',platform=$(platformId)?.value||'all';return salesHistory.filter(r=>dateInRange(r.date||r.periodEnd||r.periodStart,start,end)&&(platform==='all'||r.platform===platform))}
-function sortDataRows(list,state){return list.sort((a,b)=>{const av=a[state.key],bv=b[state.key];const numeric=['revenue','shipping','units','orders','pv','uv','conversion'].includes(state.key);const cmp=numeric?n(av)-n(bv):String(av??'').localeCompare(String(bv??''),'zh-Hant',{numeric:true});return cmp*(state.direction==='asc'?1:-1)})}
+function sortDataRows(list,state){return list.sort((a,b)=>{const av=a[state.key],bv=b[state.key];const numeric=['revenue','shipping','units','orders','pv','uv','conversion','rakutenPrice','rakutenProfit','rakutenMargin','rianyouPrice','rianyouProfit','rianyouMargin'].includes(state.key);const cmp=numeric?n(av)-n(bv):String(av??'').localeCompare(String(bv??''),'zh-Hant',{numeric:true});return cmp*(state.direction==='asc'?1:-1)})}
 function sortHeader(label,key,scope,state){return `<div class="excel-header"><span>${esc(label)}</span><select class="mini-sort" data-${scope}-sort="${key}" aria-label="${esc(label)}排序"><option value="">排序</option><option value="asc" ${state.key===key&&state.direction==='asc'?'selected':''}>▲ 小→大</option><option value="desc" ${state.key===key&&state.direction==='desc'?'selected':''}>▼ 大→小</option></select></div>`}
 function renderCrossPlatform(){
   const rows=rowsForSection('crossStart','crossEnd','crossPlatformFilter'),map=new Map();
-  for(const r of rows){const p=productForSalesRow(r),key=`${r.platform}_${r.baseSKU}`;const g=map.get(key)||{spec:p?.specManagementId||r.specManagementId,base:r.baseSKU,title:p?.title||r.title,platform:r.platform,revenue:0,shipping:0,units:0,orders:0,rows:[]};g.rows.push(r);g.units+=n(r.unitsSold);g.orders+=n(r.orderCount);g.revenue+=salesRowRevenue(r);g.shipping+=n(r.shippingReceivedTWD);map.set(key,g)}
+  for(const r of rows){const p=productForSalesRow(r),key=`${r.platform}_${r.baseSKU}`;const g=map.get(key)||{spec:p?.specManagementId||r.specManagementId,base:r.baseSKU,title:p?.title||r.title,platform:r.platform,revenue:0,shipping:0,units:0,orders:0,rakutenPrice:n(p?.manualPriceTWD),rakutenProfit:n(p?.profitTWD),rakutenMargin:p?.profitRate??null,rianyouPrice:n(p?.rianyouPriceTWD),rianyouProfit:n(p?.rianyouProfitTWD),rianyouMargin:p?.rianyouProfitRate??null,rows:[]};g.rows.push(r);g.units+=n(r.unitsSold);g.orders+=n(r.orderCount);g.revenue+=salesRowRevenue(r);g.shipping+=n(r.shippingReceivedTWD);map.set(key,g)}
   let list=[...map.values()];sortDataRows(list,crossSort);const allTotals=uniqueOrderTotals(rows);$('crossRevenue').textContent=formatInteger(allTotals.revenue);if($('crossShipping'))$('crossShipping').textContent=formatInteger(allTotals.shipping);$('crossUnits').textContent=formatInteger(list.reduce((s,x)=>s+x.units,0));$('crossCount').textContent=formatInteger(list.length);
   const labels=Object.fromEntries(CROSS_COLUMN_DEFS),cols=crossVisibleColumns.filter(k=>labels[k]);
   if($('crossPlatformHead'))$('crossPlatformHead').innerHTML='<tr>'+cols.map(k=>`<th>${sortHeader(labels[k],k,'cross',crossSort)}</th>`).join('')+'</tr>';
-  const cell=(x,k)=>k==='spec'?esc(x.spec):k==='base'?esc(x.base):k==='title'?esc(shortTitle(x.title)):k==='platform'?esc(PLATFORMS.find(p=>p.id===x.platform)?.name||x.platform):formatInteger(x[k]);
+  const cell=(x,k)=>k==='spec'?esc(x.spec):k==='base'?esc(x.base):k==='title'?esc(shortTitle(x.title)):k==='platform'?esc(PLATFORMS.find(p=>p.id===x.platform)?.name||x.platform):['rakutenMargin','rianyouMargin'].includes(k)?(Number.isFinite(Number(x[k]))?(Number(x[k])*100).toFixed(1)+'%':'—'):formatInteger(x[k]);
   $('crossPlatformBody').innerHTML=list.map(x=>'<tr>'+cols.map(k=>`<td>${cell(x,k)}</td>`).join('')+'</tr>').join('')||`<tr><td colspan="${Math.max(1,cols.length)}" class="muted">此期間尚無資料</td></tr>`;
 }
 function renderPlatformCompare(){
@@ -1531,34 +1604,38 @@ function pricingShipping(weightG){
   const kg=w/1000;if(kg>13)return {method:'新日誠',cost:null};
   const tier=params.tiers.find(([max])=>kg<=max);return {method:'新日誠',cost:tier?round(tier[1]*params.nisshinRate*params.nisshinDiscount+params.nisshinFixedFeeTWD):null};
 }
-function pricingFreeShipping(){const el=$('pricingFreeShippingTWD');return el?Math.max(0,n(el.value)):params.freeShippingTWD}
-function pricingCustomerShipping(weightG,priceTWD,freeThreshold=null){const threshold=freeThreshold===null?pricingFreeShipping():freeThreshold;return n(priceTWD)>=threshold?0:(n(weightG)/1000)*params.customerShippingPerKgTWD}
+function pricingFreeShipping(platform='rakuten'){if(platform==='rianyou')return params.rianyouFreeShippingTWD;const el=$('pricingFreeShippingTWD');return el?Math.max(0,n(el.value)):params.freeShippingTWD}
+function pricingCustomerShipping(weightG,priceTWD,freeThreshold=null,platform='rakuten'){const threshold=freeThreshold===null?pricingFreeShipping(platform):freeThreshold;return n(priceTWD)>=threshold?0:(n(weightG)/1000)*params.customerShippingPerKgTWD}
 function pricingTargetRate(){const raw=n($('pricingTargetRate')?.value);return Math.max(0,Math.min(.8,raw/100))}
-function pricingSuggested(p,targetOverride=null){
+function pricingSuggested(p,targetOverride=null,platform='rakuten'){
   const price=n(p.priceJPY),weight=n(p.weightG),store=getStore(p);if(!price||!weight)return null;
   const productCost=price*params.productCostRate;
   const domesticJPY=price>=params.freeDomesticJPY?0:(n(store?.shippingJPY)||params.domesticShippingJPY);
   const domestic=domesticJPY*params.productCostRate, ship=pricingShipping(weight).cost;if(ship===null)return null;
-  const target=targetOverride===null?params.targetProfitRate:targetOverride,denom=1-params.platformFeeRate-target;if(denom<=0)return null;
-  const customer=(weight/1000)*params.customerShippingPerKgTWD,freeThreshold=pricingFreeShipping();
+  const feeRate=platform==='rianyou'?params.rianyouPlatformFeeRate:params.platformFeeRate;
+  const defaultTarget=platform==='rianyou'?params.rianyouTargetProfitRate:params.targetProfitRate;
+  const target=targetOverride===null?defaultTarget:targetOverride,denom=1-feeRate-target;if(denom<=0)return null;
+  const customer=(weight/1000)*params.customerShippingPerKgTWD,freeThreshold=pricingFreeShipping(platform);
   let candidate=(productCost+domestic+ship-customer*(1-target))/denom;
   if(candidate>=freeThreshold)candidate=(productCost+domestic+ship)/denom;
   return round(candidate);
 }
-function pricingFinancialAtPrice(p,salePrice){
+function pricingFinancialAtPrice(p,salePrice,platform='rakuten'){
   const price=n(p.priceJPY),weight=n(p.weightG),sale=n(salePrice),store=getStore(p);if(!price||!weight||!sale)return null;
   const productCost=price*params.productCostRate;
   const domesticJPY=price>=params.freeDomesticJPY?0:(n(store?.shippingJPY)||params.domesticShippingJPY);
   const domestic=domesticJPY*params.productCostRate,ship=pricingShipping(weight).cost;if(ship===null)return null;
-  const customer=pricingCustomerShipping(weight,sale),fee=sale*params.platformFeeRate,gross=sale+customer;
+  const feeRate=platform==='rianyou'?params.rianyouPlatformFeeRate:params.platformFeeRate;
+  const customer=pricingCustomerShipping(weight,sale,null,platform),fee=sale*feeRate,gross=sale+customer;
   const profit=gross-productCost-domestic-ship-fee;return {gross,profit,margin:gross?profit/gross:null,customer,ship,productCost,domestic,fee};
 }
-function pricingMarginAtPrice(p,salePrice){return pricingFinancialAtPrice(p,salePrice)?.margin??null}
+function pricingMarginAtPrice(p,salePrice,platform='rakuten'){return pricingFinancialAtPrice(p,salePrice,platform)?.margin??null}
 function pricingBaseRows(){
   const q=cleanText($('pricingSearch')?.value).toLowerCase(),target=pricingTargetRate();
   return products.filter(p=>!q||[p.specManagementId,p.productManagementId,p.title].some(v=>cleanText(v).toLowerCase().includes(q))).map(p=>{
-    const ship=pricingShipping(p.weightG),suggested=pricingSuggested(p,target),current=n(p.manualPriceTWD),currentCustomer=pricingCustomerShipping(p.weightG,current),currentMargin=pricingMarginAtPrice(p,current),diff=suggested===null?null:suggested-current;
-    return {p,ship,suggested,current,currentCustomer,currentMargin,diff};
+    const ship=pricingShipping(p.weightG),suggested=pricingSuggested(p,target,'rakuten'),current=n(p.manualPriceTWD),currentCustomer=pricingCustomerShipping(p.weightG,current,null,'rakuten'),currentMargin=pricingMarginAtPrice(p,current,'rakuten'),diff=suggested===null?null:suggested-current;
+    const rianTarget=params.rianyouTargetProfitRate,rianyouSuggested=pricingSuggested(p,rianTarget,'rianyou'),rianyouCurrent=n(p.rianyouPriceTWD),rianyouCustomer=pricingCustomerShipping(p.weightG,rianyouCurrent,null,'rianyou'),rianyouMargin=pricingMarginAtPrice(p,rianyouCurrent,'rianyou'),rianyouDiff=rianyouSuggested===null?null:rianyouSuggested-rianyouCurrent;
+    return {p,ship,suggested,current,currentCustomer,currentMargin,diff,rianyouSuggested,rianyouCurrent,rianyouCustomer,rianyouMargin,rianyouDiff};
   });
 }
 function pricingRawValue(r,key){return {spec:cleanText(r.p.specManagementId),title:cleanText(r.p.title),priceJPY:n(r.p.priceJPY),weight:n(r.p.weightG),method:r.ship.method,shipCost:r.ship.cost===null?'超過級距':n(r.ship.cost),customer:n(r.currentCustomer),currentPrice:n(r.current),margin:r.currentMargin===null?'—':Number((r.currentMargin*100).toFixed(1)),suggested:r.suggested===null?'—':n(r.suggested),diff:r.diff===null?'—':n(r.diff)}[key]}
@@ -1578,41 +1655,56 @@ function openPricingFilterMenu(key,anchor){
   panel.innerHTML=`<button type="button" data-pricing-menu-sort="asc">⬆ 升冪排序</button><button type="button" data-pricing-menu-sort="desc">⬇ 降冪排序</button><button type="button" data-pricing-menu-clear-sort>清除排序</button><hr><input class="excel-value-search" type="search" data-pricing-menu-search placeholder="搜尋文字或項目"><label class="excel-check-all"><input type="checkbox" data-pricing-menu-all ${selected.length===allKeys.length?'checked':''}>（全選）</label><div class="excel-value-list">${values.map(([k,label])=>`<label data-pricing-value-label="${esc(String(label).toLowerCase())}"><input type="checkbox" data-pricing-menu-value value="${esc(k)}" ${selected.includes(k)?'checked':''}>${esc(label)}</label>`).join('')}</div>${values.length>=500?'<div class="muted excel-limit">僅顯示前 500 個項目</div>':''}<div class="excel-filter-actions"><button type="button" class="secondary" data-pricing-menu-clear>清除篩選</button><button type="button" data-pricing-menu-apply>套用</button></div>`;
   document.body.appendChild(panel);const rect=anchor.getBoundingClientRect();panel.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-panel.offsetWidth-12))+'px';panel.style.top=Math.max(8,Math.min(rect.bottom+4,window.innerHeight-panel.offsetHeight-12))+'px';
 }
-function pricingAdjustedOverall(list){let gross=0,profit=0,count=0;for(const r of list){if(r.suggested===null)continue;const f=pricingFinancialAtPrice(r.p,r.suggested);if(!f)continue;gross+=f.gross;profit+=f.profit;count++}return {margin:gross?profit/gross:null,count}}
+function pricingAdjustedOverall(list,platform='rakuten'){let gross=0,profit=0,count=0;for(const r of list){const suggested=platform==='rianyou'?r.rianyouSuggested:r.suggested;if(suggested===null)continue;const f=pricingFinancialAtPrice(r.p,suggested,platform);if(!f)continue;gross+=f.gross;profit+=f.profit;count++}return {margin:gross?profit/gross:null,count}}
 function pricingCartSummaryData(){
   if(!pricingCart.length)return null;
-  let sales=0,cost=0,domestic=0,weight=0;
+  let rakutenSales=0,rianyouSales=0,cost=0,domestic=0,weight=0;
   const items=[];
   for(const x of pricingCart){
     const p=products.find(y=>y.id===x.id);if(!p)continue;
-    const price=n(p.manualPriceTWD)||n(pricingSuggested(p,pricingTargetRate())),store=getStore(p),qty=Math.max(1,Math.floor(n(x.qty)||1));
+    const rakutenPrice=n(p.manualPriceTWD)||n(pricingSuggested(p,params.targetProfitRate,'rakuten'));
+    const rianyouPrice=n(p.rianyouPriceTWD)||n(pricingSuggested(p,params.rianyouTargetProfitRate,'rianyou'));
+    const store=getStore(p),qty=Math.max(1,Math.floor(n(x.qty)||1));
     const itemCost=n(p.priceJPY)*params.productCostRate*qty;
     const itemDomestic=(n(p.priceJPY)>=params.freeDomesticJPY?0:(n(store?.shippingJPY)||params.domesticShippingJPY)*params.productCostRate)*qty;
-    sales+=price*qty;cost+=itemCost;domestic+=itemDomestic;weight+=n(p.weightG)*qty;
-    items.push({p,price,qty,itemCost,itemDomestic,subtotal:price*qty});
+    rakutenSales+=rakutenPrice*qty;rianyouSales+=rianyouPrice*qty;cost+=itemCost;domestic+=itemDomestic;weight+=n(p.weightG)*qty;
+    items.push({p,rakutenPrice,rianyouPrice,qty,itemCost,itemDomestic,rakutenSubtotal:rakutenPrice*qty,rianyouSubtotal:rianyouPrice*qty});
   }
-  const ship=pricingShipping(weight),customer=n(sales)>=params.freeShippingTWD?0:(weight/1000)*params.customerShippingPerKgTWD,fee=sales*params.platformFeeRate;
-  const profit=ship.cost===null?null:sales+customer-cost-domestic-ship.cost-fee,margin=profit===null?null:profit/(sales+customer);
-  return {items,sales,cost,domestic,weight,ship,customer,fee,profit,margin};
+  const ship=pricingShipping(weight);
+  const rakutenCustomer=n(rakutenSales)>=params.freeShippingTWD?0:(weight/1000)*params.customerShippingPerKgTWD;
+  const rianyouCustomer=n(rianyouSales)>=params.rianyouFreeShippingTWD?0:(weight/1000)*params.customerShippingPerKgTWD;
+  const rakutenFee=rakutenSales*params.platformFeeRate,rianyouFee=rianyouSales*params.rianyouPlatformFeeRate;
+  const rakutenProfit=ship.cost===null?null:rakutenSales+rakutenCustomer-cost-domestic-ship.cost-rakutenFee;
+  const rianyouProfit=ship.cost===null?null:rianyouSales+rianyouCustomer-cost-domestic-ship.cost-rianyouFee;
+  const rakutenMargin=rakutenProfit===null?null:rakutenProfit/(rakutenSales+rakutenCustomer);
+  const rianyouMargin=rianyouProfit===null?null:rianyouProfit/(rianyouSales+rianyouCustomer);
+  return {items,weight,ship,cost,domestic,rakuten:{sales:rakutenSales,customer:rakutenCustomer,fee:rakutenFee,profit:rakutenProfit,margin:rakutenMargin},rianyou:{sales:rianyouSales,customer:rianyouCustomer,fee:rianyouFee,profit:rianyouProfit,margin:rianyouMargin}};
 }
 function exportPricingResults(){
   if(typeof XLSX==='undefined')return toast('Excel 匯出元件尚未載入');
   const list=pricingRows(),target=pricingTargetRate(),adjusted=pricingAdjustedOverall(list);
-  const margins=list.map(r=>r.currentMargin).filter(Number.isFinite),avg=margins.length?margins.reduce((a,b)=>a+b,0)/margins.length:null;
+  const rakutenMargins=list.map(r=>r.currentMargin).filter(Number.isFinite);
+  const rianMargins=list.map(r=>r.rianyouMargin).filter(Number.isFinite);
+  const rakutenAvg=rakutenMargins.length?rakutenMargins.reduce((a,b)=>a+b,0)/rakutenMargins.length:null;
+  const rianAvg=rianMargins.length?rianMargins.reduce((a,b)=>a+b,0)/rianMargins.length:null;
   const filterSummary=Object.entries(pricingColumnFilters).filter(([,v])=>Array.isArray(v)&&v.length).map(([k,v])=>`${k}: ${v.join('、')}`).join('；')||'無';
   const sortSummary=pricingSortState.key?`${pricingSortState.key} ${pricingSortState.direction==='asc'?'升冪':'降冪'}`:'無';
   const summaryRows=[
     ['匯出時間',new Date().toLocaleString('zh-TW')],
-    ['目標利潤率',target],
-    ['此表單免運門檻(TWD)',pricingFreeShipping()],
+    ['樂天目標利潤率（此表單）',target],
+    ['日安目標利潤率',params.rianyouTargetProfitRate],
+    ['樂天免運門檻(TWD)（此表單）',pricingFreeShipping('rakuten')],
+    ['日安免運門檻(TWD)',params.rianyouFreeShippingTWD],
+    ['樂天平台費率',params.platformFeeRate],
+    ['日安平台費率',params.rianyouPlatformFeeRate],
     ['客收運費/公斤(TWD)',params.customerShippingPerKgTWD],
-    ['平台費率',params.platformFeeRate],
     ['搜尋關鍵字',cleanText($('pricingSearch')?.value)],
     ['表頭篩選',filterSummary],
     ['排序',sortSummary],
     ['目前篩選商品數',list.length],
-    ['目前平均利潤率',avg??''],
-    ['參數調整後整體利潤率',adjusted.margin??'']
+    ['樂天平均利潤率',rakutenAvg??''],
+    ['日安平均利潤率',rianAvg??''],
+    ['樂天參數調整後整體利潤率',adjusted.margin??'']
   ];
   const singleRows=list.map(r=>({
     '商品規格管理編號':r.p.specManagementId||'',
@@ -1622,70 +1714,89 @@ function exportPricingResults(){
     '重量(g)':n(r.p.weightG),
     '物流':r.ship.method||'',
     '單件物流成本(TWD)':r.ship.cost===null?'超過級距':n(r.ship.cost),
-    '目前售價客收運費(TWD)':n(r.currentCustomer),
-    '目前售價(TWD)':n(r.current),
-    '目前售價利潤率':r.currentMargin??'',
-    '目標利潤率':target,
-    '目標利潤建議售價(TWD)':r.suggested??'',
-    '建議售價客收運費(TWD)':r.suggested===null?'':pricingCustomerShipping(r.p.weightG,r.suggested),
-    '調整金額(TWD)':r.diff??''
+    '樂天客收運費(TWD)':n(r.currentCustomer),
+    '樂天目前售價(TWD)':n(r.current),
+    '樂天目前利潤率':r.currentMargin??'',
+    '樂天30%利潤建議售價(TWD)':r.suggested??'',
+    '樂天調整金額(TWD)':r.diff??'',
+    '日安客收運費(TWD)':n(r.rianyouCustomer),
+    '日安目前售價(TWD)':n(r.rianyouCurrent),
+    '日安目前利潤率':r.rianyouMargin??'',
+    '日安30%利潤建議售價(TWD)':r.rianyouSuggested??'',
+    '日安調整金額(TWD)':r.rianyouDiff??''
   }));
   const cart=pricingCartSummaryData();
   const multiRows=cart?cart.items.map(x=>({
     '商品規格管理編號':x.p.specManagementId||'',
     '商品管理編號':x.p.productManagementId||'',
     '商品標題':x.p.title||'',
-    '單價(TWD)':x.price,
+    '樂天單價(TWD)':x.rakutenPrice,
+    '日安單價(TWD)':x.rianyouPrice,
     '重量(g)':n(x.p.weightG),
     '數量':x.qty,
-    '小計(TWD)':x.subtotal,
+    '樂天小計(TWD)':x.rakutenSubtotal,
+    '日安小計(TWD)':x.rianyouSubtotal,
     '商品成本(TWD)':x.itemCost,
     '日本國內運費(TWD)':x.itemDomestic
   })):[{'說明':'尚未加入多件訂單試算商品'}];
   const multiSummary=cart?[
-    ['商品總額(TWD)',cart.sales],['總重量(g)',cart.weight],['物流方式',cart.ship.method],['實際物流(TWD)',cart.ship.cost??'超過級距'],
-    ['客收運費(TWD)',cart.customer],['商品成本(TWD)',cart.cost],['日本國內運費(TWD)',cart.domestic],['平台費(TWD)',cart.fee],
-    ['預估淨利(TWD)',cart.profit??''],['訂單利潤率',cart.margin??''],['系統正式免運門檻(TWD)',params.freeShippingTWD]
+    ['總重量(g)',cart.weight],['物流方式',cart.ship.method],['實際物流(TWD)',cart.ship.cost??'超過級距'],
+    ['樂天商品總額(TWD)',cart.rakuten.sales],['樂天客收運費(TWD)',cart.rakuten.customer],['樂天平台費(TWD)',cart.rakuten.fee],['樂天預估淨利(TWD)',cart.rakuten.profit??''],['樂天訂單利潤率',cart.rakuten.margin??''],
+    ['日安商品總額(TWD)',cart.rianyou.sales],['日安客收運費(TWD)',cart.rianyou.customer],['日安平台費(TWD)',cart.rianyou.fee],['日安預估淨利(TWD)',cart.rianyou.profit??''],['日安訂單利潤率',cart.rianyou.margin??''],
+    ['商品成本(TWD)',cart.cost],['日本國內運費(TWD)',cart.domestic]
   ]:[['說明','尚未加入多件訂單試算商品']];
+
   const wb=XLSX.utils.book_new();
   const summarySheet=XLSX.utils.aoa_to_sheet([['定價試算摘要',''],...summaryRows]);
   const singleSheet=XLSX.utils.json_to_sheet(singleRows.length?singleRows:[{'說明':'目前篩選沒有商品'}]);
   const multiSheet=XLSX.utils.json_to_sheet(multiRows);
   const multiSummarySheet=XLSX.utils.aoa_to_sheet([['多件訂單試算摘要',''],...multiSummary]);
-  // 套用百分比格式，Excel 開啟後可直接閱讀與再計算。
-  for(const [sheet,labels] of [[summarySheet,['目標利潤率','平台費率','目前平均利潤率','參數調整後整體利潤率']],[multiSummarySheet,['訂單利潤率']]]){
-    const range=XLSX.utils.decode_range(sheet['!ref']||'A1:A1');
-    for(let R=range.s.r;R<=range.e.r;R++){
-      const a=sheet[XLSX.utils.encode_cell({r:R,c:0})],b=sheet[XLSX.utils.encode_cell({r:R,c:1})];
-      if(a&&b&&labels.includes(String(a.v))&&typeof b.v==='number')b.z='0.0%';
-    }
-  }
-  if(singleSheet['!ref']){
-    const range=XLSX.utils.decode_range(singleSheet['!ref']);
-    const header={};for(let C=range.s.c;C<=range.e.c;C++){const cell=singleSheet[XLSX.utils.encode_cell({r:0,c:C})];if(cell)header[String(cell.v)]=C}
-    for(const label of ['目前售價利潤率','目標利潤率']){const C=header[label];if(C===undefined)continue;for(let R=1;R<=range.e.r;R++){const cell=singleSheet[XLSX.utils.encode_cell({r:R,c:C})];if(cell&&typeof cell.v==='number')cell.z='0.0%'}}
-  }
-  XLSX.utils.book_append_sheet(wb,summarySheet,'試算摘要');
-  XLSX.utils.book_append_sheet(wb,singleSheet,'單件重新定價');
-  XLSX.utils.book_append_sheet(wb,multiSheet,'多件訂單明細');
-  XLSX.utils.book_append_sheet(wb,multiSummarySheet,'多件訂單摘要');
+  XLSX.utils.book_append_sheet(wb,summarySheet,'摘要');
+  XLSX.utils.book_append_sheet(wb,singleSheet,'單件商品');
+  XLSX.utils.book_append_sheet(wb,multiSheet,'多件商品');
+  XLSX.utils.book_append_sheet(wb,multiSummarySheet,'多件摘要');
   XLSX.writeFile(wb,`定價試算_${new Date().toISOString().slice(0,10)}.xlsx`);
   toast(`已下載定價試算：單件 ${list.length} 筆${cart?`、多件 ${cart.items.length} 項`:''}`);
 }
-function renderPricingHeaderState(){document.querySelectorAll('[data-pricing-filter-menu]').forEach(btn=>{const key=btn.dataset.pricingFilterMenu,active=pricingSortState.key===key,filtered=Array.isArray(pricingColumnFilters[key])&&pricingColumnFilters[key].length;btn.classList.toggle('active',active||filtered);btn.textContent=active?(pricingSortState.direction==='asc'?'▲':'▼'):'▼'})}
 function renderPricingPage(){
   if(!$('pricingTableBody'))return;const target=pricingTargetRate(),list=pricingRows();
-  const margins=list.map(r=>r.currentMargin).filter(Number.isFinite),avg=margins.length?margins.reduce((a,b)=>a+b,0)/margins.length:null,adjusted=pricingAdjustedOverall(list);
-  if($('pricingAvgCurrentMargin'))$('pricingAvgCurrentMargin').textContent=avg===null?'—':(avg*100).toFixed(1)+'%';
-  if($('pricingAdjustedOverallMargin'))$('pricingAdjustedOverallMargin').textContent=adjusted.margin===null?'—':(adjusted.margin*100).toFixed(1)+'%';
-  if($('pricingAdjustedOverallNote'))$('pricingAdjustedOverallNote').textContent=`依建議售價、目前篩選 ${adjusted.count} 項商品各 1 件彙總｜免運門檻 ${formatInteger(pricingFreeShipping())} 元`;
+  const margins=list.map(r=>r.currentMargin).filter(Number.isFinite),avg=margins.length?margins.reduce((a,b)=>a+b,0)/margins.length:null;const rianMargins=list.map(r=>r.rianyouMargin).filter(Number.isFinite),rianAvg=rianMargins.length?rianMargins.reduce((a,b)=>a+b,0)/rianMargins.length:null,adjusted=pricingAdjustedOverall(list,'rakuten'),rianAdjusted=pricingAdjustedOverall(list,'rianyou');
+  if($('pricingAvgCurrentMargin'))$('pricingAvgCurrentMargin').textContent=avg===null?'—':(avg*100).toFixed(1)+'%';if($('pricingRianyouAvgCurrentMargin'))$('pricingRianyouAvgCurrentMargin').textContent=rianAvg===null?'—':(rianAvg*100).toFixed(1)+'%';
+  if($('pricingAdjustedOverallMargin'))$('pricingAdjustedOverallMargin').textContent=adjusted.margin===null?'—':(adjusted.margin*100).toFixed(1)+'%';if($('pricingRianyouAdjustedOverallMargin'))$('pricingRianyouAdjustedOverallMargin').textContent=rianAdjusted.margin===null?'—':(rianAdjusted.margin*100).toFixed(1)+'%';
+  if($('pricingAdjustedOverallNote'))$('pricingAdjustedOverallNote').textContent=`依樂天建議售價、目前篩選 ${adjusted.count} 項商品各 1 件彙總｜免運門檻 ${formatInteger(pricingFreeShipping('rakuten'))} 元`;if($('pricingRianyouAdjustedOverallNote'))$('pricingRianyouAdjustedOverallNote').textContent=`依日安建議售價、目前篩選 ${rianAdjusted.count} 項商品各 1 件彙總｜免運門檻 ${formatInteger(params.rianyouFreeShippingTWD)} 元`;
   if($('pricingVisibleCount'))$('pricingVisibleCount').textContent=formatInteger(list.length);
   if($('pricingAvgCurrentNote'))$('pricingAvgCurrentNote').textContent=`依目前售價與目前篩選商品的單品利潤率取平均｜此表單免運門檻 ${formatInteger(pricingFreeShipping())} 元`;
-  $('pricingTableBody').innerHTML=list.map(r=>{const {p,ship,suggested,current,currentCustomer,currentMargin,diff}=r;return `<tr><td>${esc(p.specManagementId||'')}</td><td>${esc(shortTitle(p.title||''))}</td><td>${formatInteger(p.priceJPY)}</td><td>${formatInteger(p.weightG)}</td><td>${esc(ship.method)}</td><td>${ship.cost===null?'超過級距':formatInteger(ship.cost)}</td><td>${formatInteger(currentCustomer)}</td><td>${formatInteger(current)}</td><td>${currentMargin===null?'—':(currentMargin*100).toFixed(1)+'%'}</td><td><strong>${suggested===null?'—':formatInteger(suggested)}</strong><small class="muted"> ${(target*100).toFixed(1)}%</small></td><td>${suggested===null?'—':(diff>0?'↑ +':diff<0?'↓ ':'')+formatInteger(diff)}</td></tr>`}).join('')||'<tr><td colspan="11" class="muted">沒有符合商品</td></tr>';
+  $('pricingTableBody').innerHTML=list.map(r=>{const {p,ship,suggested,current,currentCustomer,currentMargin,diff,rianyouSuggested,rianyouCurrent,rianyouCustomer,rianyouMargin,rianyouDiff}=r;return `<tr><td>${esc(p.specManagementId||'')}</td><td>${esc(shortTitle(p.title||''))}</td><td>${formatInteger(p.priceJPY)}</td><td>${formatInteger(p.weightG)}</td><td>${esc(ship.method)}</td><td>${ship.cost===null?'超過級距':formatInteger(ship.cost)}</td><td>${formatInteger(currentCustomer)}</td><td>${formatInteger(current)}</td><td>${currentMargin===null?'—':(currentMargin*100).toFixed(1)+'%'}</td><td><strong>${suggested===null?'—':formatInteger(suggested)}</strong><small class="muted"> ${(target*100).toFixed(1)}%</small></td><td>${suggested===null?'—':(diff>0?'↑ +':diff<0?'↓ ':'')+formatInteger(diff)}</td><td>${formatInteger(rianyouCustomer)}</td><td>${formatInteger(rianyouCurrent)}</td><td>${rianyouMargin===null?'—':(rianyouMargin*100).toFixed(1)+'%'}</td><td><strong>${rianyouSuggested===null?'—':formatInteger(rianyouSuggested)}</strong><small class="muted"> ${(params.rianyouTargetProfitRate*100).toFixed(1)}%</small></td><td>${rianyouSuggested===null?'—':(rianyouDiff>0?'↑ +':rianyouDiff<0?'↓ ':'')+formatInteger(rianyouDiff)}</td></tr>`}).join('')||'<tr><td colspan="16" class="muted">沒有符合商品</td></tr>';
   renderPricingHeaderState();renderPricingCart();
 }
-function renderPricingCart(){if(!$('pricingCartBody'))return;$('pricingCartBody').innerHTML=pricingCart.map((x,i)=>{const p=products.find(y=>y.id===x.id);if(!p)return'';const price=n(p.manualPriceTWD)||n(pricingSuggested(p,pricingTargetRate()));return `<tr><td>${esc(p.specManagementId||p.title||'')}</td><td>${formatInteger(price)}</td><td>${formatInteger(p.weightG)}</td><td>${x.qty}</td><td>${formatInteger(price*x.qty)}</td><td><button type="button" class="secondary" data-pricing-remove="${i}">移除</button></td></tr>`}).join('')||'<tr><td colspan="6" class="muted">尚未加入商品</td></tr>';renderPricingSummary()}
-function renderPricingSummary(){if(!$('pricingSummary'))return;const x=pricingCartSummaryData();if(!x){$('pricingSummary').textContent='請先加入商品。';return}const {sales,weight,ship,customer,profit,margin}=x;$('pricingSummary').innerHTML=`<div class="overview-kpis"><article class="card stat"><span>商品總額</span><strong>${formatInteger(sales)}</strong></article><article class="card stat"><span>總重量</span><strong>${formatInteger(weight)}g</strong></article><article class="card stat"><span>實際物流</span><strong>${ship.cost===null?'超過級距':formatInteger(ship.cost)}</strong><small>${esc(ship.method)}</small></article><article class="card stat"><span>客收運費</span><strong>${formatInteger(customer)}</strong></article><article class="card stat"><span>預估淨利</span><strong>${profit===null?'—':formatInteger(profit)}</strong></article><article class="card stat"><span>訂單利潤率</span><strong>${margin===null?'—':(margin*100).toFixed(1)+'%'}</strong><small>${margin===null?'':margin>=params.targetProfitRate?'✓ 達標':'⚠ 低於目標'}</small></article></div>`}
+function renderPricingCart(){
+  if(!$('pricingCartBody'))return;
+  $('pricingCartBody').innerHTML=pricingCart.map((x,i)=>{
+    const p=products.find(y=>y.id===x.id);if(!p)return'';
+    const rakuten=n(p.manualPriceTWD)||n(pricingSuggested(p,params.targetProfitRate,'rakuten'));
+    const rianyou=n(p.rianyouPriceTWD)||n(pricingSuggested(p,params.rianyouTargetProfitRate,'rianyou'));
+    return `<tr><td>${esc(p.specManagementId||p.title||'')}</td><td>${formatInteger(rakuten)}</td><td>${formatInteger(rianyou)}</td><td>${formatInteger(p.weightG)}</td><td>${x.qty}</td><td>${formatInteger(rakuten*x.qty)}</td><td>${formatInteger(rianyou*x.qty)}</td><td><button type="button" class="secondary" data-pricing-remove="${i}">移除</button></td></tr>`;
+  }).join('')||'<tr><td colspan="8" class="muted">尚未加入商品</td></tr>';
+  renderPricingSummary();
+}
+function renderPricingSummary(){
+  if(!$('pricingSummary'))return;
+  const x=pricingCartSummaryData();
+  if(!x){$('pricingSummary').textContent='請先加入商品。';return}
+  const r=x.rakuten,d=x.rianyou;
+  $('pricingSummary').innerHTML=`<div class="overview-kpis">
+    <article class="card stat"><span>總重量</span><strong>${formatInteger(x.weight)}g</strong></article>
+    <article class="card stat"><span>實際物流</span><strong>${x.ship.cost===null?'超過級距':formatInteger(x.ship.cost)}</strong><small>${esc(x.ship.method)}</small></article>
+    <article class="card stat"><span>樂天商品總額</span><strong>${formatInteger(r.sales)}</strong></article>
+    <article class="card stat"><span>樂天客收運費</span><strong>${formatInteger(r.customer)}</strong></article>
+    <article class="card stat"><span>樂天預估淨利</span><strong>${r.profit===null?'—':formatInteger(r.profit)}</strong></article>
+    <article class="card stat"><span>樂天訂單利潤率</span><strong>${r.margin===null?'—':(r.margin*100).toFixed(1)+'%'}</strong></article>
+    <article class="card stat"><span>日安商品總額</span><strong>${formatInteger(d.sales)}</strong></article>
+    <article class="card stat"><span>日安客收運費</span><strong>${formatInteger(d.customer)}</strong></article>
+    <article class="card stat"><span>日安預估淨利</span><strong>${d.profit===null?'—':formatInteger(d.profit)}</strong></article>
+    <article class="card stat"><span>日安訂單利潤率</span><strong>${d.margin===null?'—':(d.margin*100).toFixed(1)+'%'}</strong></article>
+  </div>`;
+}
 
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('loginError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value,$('loginPassword').value)}catch(err){$('loginError').textContent='登入失敗：'+err.message}});
 $('logoutBtn').onclick=()=>signOut(auth);$('searchInput').oninput=()=>{page=1;renderAll()};$('statusFilter').onchange=()=>{page=1;renderAll()};$('prevPage').onclick=()=>{page--;renderTable()};$('nextPage').onclick=()=>{page++;renderTable()};
@@ -1700,8 +1811,8 @@ document.addEventListener('change',e=>{if(e.target.matches('[data-cross-sort]')&
 
 $('productTabBtn').onclick=()=>setView('products');if($('pricingTabBtn'))$('pricingTabBtn').onclick=()=>setView('pricing');if($('pricingSearch'))$('pricingSearch').oninput=renderPricingPage;if($('pricingTargetRate'))$('pricingTargetRate').oninput=()=>{renderPricingPage();renderPricingCart()};if($('pricingFreeShippingTWD'))$('pricingFreeShippingTWD').oninput=renderPricingPage;if($('pricingExportBtn'))$('pricingExportBtn').onclick=exportPricingResults;document.querySelectorAll('[data-pricing-filter-menu]').forEach(btn=>btn.onclick=e=>{e.stopPropagation();openPricingFilterMenu(btn.dataset.pricingFilterMenu,btn)});document.addEventListener('input',e=>{if(!e.target.matches('[data-pricing-menu-search]'))return;const panel=e.target.closest('#pricingExcelFilterMenu'),q=cleanText(e.target.value).toLowerCase();panel?.querySelectorAll('[data-pricing-value-label]').forEach(label=>label.classList.toggle('hidden',q&&!label.dataset.pricingValueLabel.includes(q)))});document.addEventListener('click',e=>{const panel=e.target.closest('#pricingExcelFilterMenu');if(!panel){if(!e.target.closest('[data-pricing-filter-menu]'))closePricingFilterMenu();return}e.stopPropagation();const key=activePricingFilterKey;if(e.target.closest('[data-pricing-menu-sort]')){pricingSortState={key,direction:e.target.closest('[data-pricing-menu-sort]').dataset.pricingMenuSort};renderPricingPage();closePricingFilterMenu();return}if(e.target.closest('[data-pricing-menu-clear-sort]')){if(pricingSortState.key===key)pricingSortState={key:'',direction:'asc'};renderPricingPage();closePricingFilterMenu();return}if(e.target.matches('[data-pricing-menu-all]')){panel.querySelectorAll('[data-pricing-menu-value]').forEach(x=>x.checked=e.target.checked);return}if(e.target.closest('[data-pricing-menu-clear]')){delete pricingColumnFilters[key];renderPricingPage();closePricingFilterMenu();return}if(e.target.closest('[data-pricing-menu-apply]')){const all=[...panel.querySelectorAll('[data-pricing-menu-value]')],selected=all.filter(x=>x.checked).map(x=>x.value);pricingColumnFilters[key]=selected.length===all.length?[]:selected;renderPricingPage();closePricingFilterMenu();return}});if($('pricingAddBtn'))$('pricingAddBtn').onclick=()=>{const spec=cleanText($('pricingSpecInput')?.value),qty=Math.max(1,Math.floor(n($('pricingQty').value)||1));if(!spec){if($('pricingAddMsg'))$('pricingAddMsg').textContent='請輸入商品規格管理編號';return}const p=products.find(x=>cleanText(x.specManagementId).toLowerCase()===spec.toLowerCase());if(!p){if($('pricingAddMsg'))$('pricingAddMsg').textContent='找不到此商品規格管理編號';return}const old=pricingCart.find(x=>x.id===p.id);if(old)old.qty+=qty;else pricingCart.push({id:p.id,qty});if($('pricingAddMsg'))$('pricingAddMsg').textContent=`已加入：${p.specManagementId||''} ${shortTitle(p.title||'')}`;if($('pricingSpecInput'))$('pricingSpecInput').value='';renderPricingCart()};if($('pricingClearBtn'))$('pricingClearBtn').onclick=()=>{pricingCart=[];renderPricingCart()};if($('pricingCartBody'))$('pricingCartBody').onclick=e=>{const i=e.target.dataset.pricingRemove;if(i===undefined)return;pricingCart.splice(Number(i),1);renderPricingCart()};if($('importTabBtn'))$('importTabBtn').onclick=()=>setView('imports');$('salesTabBtn').onclick=()=>{initSalesFilterDates();setView('sales')};$('overviewTabBtn').onclick=()=>{initOverviewDates();setView('overview')};$('crossPlatformTabBtn').onclick=()=>{initOverviewDates();setView('crossPlatform')};$('platformCompareTabBtn').onclick=()=>{initOverviewDates();setView('platformCompare')};$('applyOverviewBtn').onclick=renderOverview;$('overviewStart').onchange=renderOverview;$('overviewEnd').onchange=renderOverview;$('overviewPlatform').onchange=renderOverview;$('rankingSort').onchange=renderOverview;$('resetOverviewBtn').onclick=()=>{$('overviewStart').value='';$('overviewEnd').value='';$('overviewPlatform').value='all';renderOverview()};$('selectFilteredBtn').onclick=()=>{filtered().forEach(p=>selectedProductIds.add(p.id));renderTable();updateSelectionCount();toast('已選取全部篩選結果')};$('clearSelectionBtn').onclick=()=>{selectedProductIds.clear();renderTable();updateSelectionCount()};$('discountCalcBtn').onclick=openDiscountDialog;$('recalcDiscountBtn').onclick=renderDiscountResults;$('discountPercent').oninput=renderDiscountResults;$('exportDiscountBtn').onclick=exportDiscountResults;
 $('addProductBtn').onclick=()=>{renderProductForm({active:true});$('productDialog').showModal()};$('productForm').addEventListener('submit',async e=>{e.preventDefault();await saveProduct(e.currentTarget)});
-$('productFields').addEventListener('input',e=>{const el=e.target.closest('[data-field-key]');if(!el||el.readOnly)return;const k=el.dataset.fieldKey;if(el.dataset.fieldMode==='calculated')productFormManualOverrides.add(k);if(k==='priceJPY'){['productCostTWD','suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate'].forEach(x=>productFormManualOverrides.delete(x))}if(k==='domesticShippingTWD'){['suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate'].forEach(x=>productFormManualOverrides.delete(x))}updateProductFormCalculatedFields(k)});
-$('productFields').addEventListener('change',e=>{const el=e.target.closest('[data-field-key]');if(!el||el.readOnly)return;const k=el.dataset.fieldKey;if(el.dataset.fieldMode==='calculated')productFormManualOverrides.add(k);if(k==='priceJPY'){['productCostTWD','suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate'].forEach(x=>productFormManualOverrides.delete(x))}if(k==='domesticShippingTWD'){['suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate'].forEach(x=>productFormManualOverrides.delete(x))}updateProductFormCalculatedFields(k)});
+$('productFields').addEventListener('input',e=>{const el=e.target.closest('[data-field-key]');if(!el||el.readOnly)return;const k=el.dataset.fieldKey;if(el.dataset.fieldMode==='calculated')productFormManualOverrides.add(k);if(k==='priceJPY'){['productCostTWD','suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate','rianyouSuggestedPrice30TWD','rianyouCustomerShippingTWD','rianyouGrossReceivedTWD','rianyouPlatformFeeTWD','rianyouProfitTWD','rianyouProfitRate'].forEach(x=>productFormManualOverrides.delete(x))}if(k==='domesticShippingTWD'){['suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate','rianyouSuggestedPrice30TWD','rianyouCustomerShippingTWD','rianyouGrossReceivedTWD','rianyouPlatformFeeTWD','rianyouProfitTWD','rianyouProfitRate'].forEach(x=>productFormManualOverrides.delete(x))}updateProductFormCalculatedFields(k)});
+$('productFields').addEventListener('change',e=>{const el=e.target.closest('[data-field-key]');if(!el||el.readOnly)return;const k=el.dataset.fieldKey;if(el.dataset.fieldMode==='calculated')productFormManualOverrides.add(k);if(k==='priceJPY'){['productCostTWD','suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate','rianyouSuggestedPrice30TWD','rianyouCustomerShippingTWD','rianyouGrossReceivedTWD','rianyouPlatformFeeTWD','rianyouProfitTWD','rianyouProfitRate'].forEach(x=>productFormManualOverrides.delete(x))}if(k==='domesticShippingTWD'){['suggestedPrice30TWD','customerShippingTWD','grossReceivedTWD','platformFeeTWD','profitTWD','profitRate','rianyouSuggestedPrice30TWD','rianyouCustomerShippingTWD','rianyouGrossReceivedTWD','rianyouPlatformFeeTWD','rianyouProfitTWD','rianyouProfitRate'].forEach(x=>productFormManualOverrides.delete(x))}updateProductFormCalculatedFields(k)});
 $('productFields').addEventListener('click',e=>{const k=e.target.dataset.reset;if(!k)return;productFormManualOverrides.delete(k);updateProductFormCalculatedFields()});
 $('tableBody').addEventListener('change',e=>{const id=e.target.dataset.selectProduct;if(!id)return;e.target.checked?selectedProductIds.add(id):selectedProductIds.delete(id);updateSelectionCount()});
 $('tableHead').addEventListener('change',e=>{if(e.target.id!=='selectPageCheckbox')return;const list=filtered().slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);list.forEach(p=>e.target.checked?selectedProductIds.add(p.id):selectedProductIds.delete(p.id));renderTable();updateSelectionCount()});
