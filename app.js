@@ -1606,7 +1606,7 @@ function pricingShipping(weightG){
   const tier=params.tiers.find(([max])=>kg<=max);return {method:'新日誠',cost:tier?round(tier[1]*params.nisshinRate*params.nisshinDiscount+params.nisshinFixedFeeTWD):null};
 }
 function pricingFreeShipping(platform='rakuten'){if(platform==='rianyou')return params.rianyouFreeShippingTWD;const el=$('pricingFreeShippingTWD');return el?Math.max(0,n(el.value)):params.freeShippingTWD}
-function pricingCustomerShipping(weightG,priceTWD,freeThreshold=null,platform='rakuten'){const threshold=freeThreshold===null?pricingFreeShipping(platform):freeThreshold;return n(priceTWD)>=threshold?0:(n(weightG)/1000)*params.customerShippingPerKgTWD}
+function pricingCustomerShipping(weightG,priceTWD,freeThreshold=null,platform='rakuten'){const threshold=freeThreshold===null?pricingFreeShipping(platform):freeThreshold;return n(priceTWD)>=threshold?0:ceilKg(weightG)*params.customerShippingPerKgTWD}
 function pricingTargetRate(){const raw=n($('pricingTargetRate')?.value);return Math.max(0,Math.min(.8,raw/100))}
 // 定價試算專用成本來源：完全不使用任何舊固定倍率或由台幣售價回推日幣的邏輯。
 // 商品成本以已保存的日幣售價換算；若商品主檔有人工作業覆寫商品成本 / 日本國內運費，則尊重該值。
@@ -1627,7 +1627,7 @@ function pricingSuggested(p,targetOverride=null,platform='rakuten'){
   const feeRate=platform==='rianyou'?params.rianyouPlatformFeeRate:params.platformFeeRate;
   const defaultTarget=platform==='rianyou'?params.rianyouTargetProfitRate:params.targetProfitRate;
   const target=targetOverride===null?defaultTarget:targetOverride,denom=1-feeRate-target;if(denom<=0)return null;
-  const customer=(c.weight/1000)*params.customerShippingPerKgTWD,freeThreshold=pricingFreeShipping(platform);
+  const customer=ceilKg(c.weight)*params.customerShippingPerKgTWD,freeThreshold=pricingFreeShipping(platform);
   // 未達免運：售價 = [商品成本 + 日本國內運費 + 實際物流 - 客收運費×(1-目標利潤率)] ÷ [1-平台費率-目標利潤率]
   let candidate=(c.productCost+c.domestic+c.ship-customer*(1-target))/denom;
   // 若第一次反推的售價已達免運門檻，客收運費必須歸零後重新反推。
@@ -1683,8 +1683,8 @@ function pricingCartSummaryData(){
     items.push({p,rakutenPrice,rianyouPrice,qty,itemCost,itemDomestic,rakutenSubtotal:rakutenPrice*qty,rianyouSubtotal:rianyouPrice*qty});
   }
   const ship=pricingShipping(weight);
-  const rakutenCustomer=n(rakutenSales)>=params.freeShippingTWD?0:(weight/1000)*params.customerShippingPerKgTWD;
-  const rianyouCustomer=n(rianyouSales)>=params.rianyouFreeShippingTWD?0:(weight/1000)*params.customerShippingPerKgTWD;
+  const rakutenCustomer=n(rakutenSales)>=params.freeShippingTWD?0:ceilKg(weight)*params.customerShippingPerKgTWD;
+  const rianyouCustomer=n(rianyouSales)>=params.rianyouFreeShippingTWD?0:ceilKg(weight)*params.customerShippingPerKgTWD;
   const rakutenFee=rakutenSales*params.platformFeeRate,rianyouFee=rianyouSales*params.rianyouPlatformFeeRate;
   const rakutenProfit=ship.cost===null?null:rakutenSales+rakutenCustomer-cost-domestic-ship.cost-rakutenFee;
   const rianyouProfit=ship.cost===null?null:rianyouSales+rianyouCustomer-cost-domestic-ship.cost-rianyouFee;
