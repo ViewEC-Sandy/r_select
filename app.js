@@ -192,6 +192,7 @@ function compute(base){
   };
 }
 function calcSuggested(j,k,o,weight){return calcSuggestedPlatform(j,k,o,weight,params.platformFeeRate,params.targetProfitRate,params.freeShippingTWD)}
+// LEGACY：僅保留供舊資料追溯；新商品與「定價試算」不得呼叫此函式。
 function reverseJPYFromTargetTWD(targetPriceTWD,weight,store){
   const manual=Number(targetPriceTWD), rate=Number(params.productCostRate), target=Number(params.targetProfitRate);
   if(!Number.isFinite(manual)||manual<=0||!Number.isFinite(rate)||rate<=0)return null;
@@ -1607,27 +1608,38 @@ function pricingShipping(weightG){
 function pricingFreeShipping(platform='rakuten'){if(platform==='rianyou')return params.rianyouFreeShippingTWD;const el=$('pricingFreeShippingTWD');return el?Math.max(0,n(el.value)):params.freeShippingTWD}
 function pricingCustomerShipping(weightG,priceTWD,freeThreshold=null,platform='rakuten'){const threshold=freeThreshold===null?pricingFreeShipping(platform):freeThreshold;return n(priceTWD)>=threshold?0:(n(weightG)/1000)*params.customerShippingPerKgTWD}
 function pricingTargetRate(){const raw=n($('pricingTargetRate')?.value);return Math.max(0,Math.min(.8,raw/100))}
+// 定價試算專用成本來源：完全不使用任何舊固定倍率或由台幣售價回推日幣的邏輯。
+// 商品成本以已保存的日幣售價換算；若商品主檔有人工作業覆寫商品成本 / 日本國內運費，則尊重該值。
+function pricingCostInputs(p){
+  const price=n(p.priceJPY),weight=n(p.weightG);if(!price||!weight)return null;
+  const productCost=Number.isFinite(Number(p.productCostTWD))?n(p.productCostTWD):price*params.productCostRate;
+  let domestic;
+  if(Number.isFinite(Number(p.domesticShippingTWD)))domestic=n(p.domesticShippingTWD);
+  else{
+    const store=getStore(p),domesticJPY=price>=params.freeDomesticJPY?0:(n(store?.shippingJPY)||params.domesticShippingJPY);
+    domestic=domesticJPY*params.productCostRate;
+  }
+  const shipping=pricingShipping(weight);if(shipping.cost===null)return null;
+  return {price,weight,productCost,domestic,ship:n(shipping.cost),method:shipping.method};
+}
 function pricingSuggested(p,targetOverride=null,platform='rakuten'){
-  const price=n(p.priceJPY),weight=n(p.weightG),store=getStore(p);if(!price||!weight)return null;
-  const productCost=price*params.productCostRate;
-  const domesticJPY=price>=params.freeDomesticJPY?0:(n(store?.shippingJPY)||params.domesticShippingJPY);
-  const domestic=domesticJPY*params.productCostRate, ship=pricingShipping(weight).cost;if(ship===null)return null;
+  const c=pricingCostInputs(p);if(!c)return null;
   const feeRate=platform==='rianyou'?params.rianyouPlatformFeeRate:params.platformFeeRate;
   const defaultTarget=platform==='rianyou'?params.rianyouTargetProfitRate:params.targetProfitRate;
   const target=targetOverride===null?defaultTarget:targetOverride,denom=1-feeRate-target;if(denom<=0)return null;
-  const customer=(weight/1000)*params.customerShippingPerKgTWD,freeThreshold=pricingFreeShipping(platform);
-  let candidate=(productCost+domestic+ship-customer*(1-target))/denom;
-  if(candidate>=freeThreshold)candidate=(productCost+domestic+ship)/denom;
+  const customer=(c.weight/1000)*params.customerShippingPerKgTWD,freeThreshold=pricingFreeShipping(platform);
+  // 未達免運：售價 = [商品成本 + 日本國內運費 + 實際物流 - 客收運費×(1-目標利潤率)] ÷ [1-平台費率-目標利潤率]
+  let candidate=(c.productCost+c.domestic+c.ship-customer*(1-target))/denom;
+  // 若第一次反推的售價已達免運門檻，客收運費必須歸零後重新反推。
+  if(candidate>=freeThreshold)candidate=(c.productCost+c.domestic+c.ship)/denom;
   return round(candidate);
 }
 function pricingFinancialAtPrice(p,salePrice,platform='rakuten'){
-  const price=n(p.priceJPY),weight=n(p.weightG),sale=n(salePrice),store=getStore(p);if(!price||!weight||!sale)return null;
-  const productCost=price*params.productCostRate;
-  const domesticJPY=price>=params.freeDomesticJPY?0:(n(store?.shippingJPY)||params.domesticShippingJPY);
-  const domestic=domesticJPY*params.productCostRate,ship=pricingShipping(weight).cost;if(ship===null)return null;
+  const c=pricingCostInputs(p),sale=n(salePrice);if(!c||!sale)return null;
   const feeRate=platform==='rianyou'?params.rianyouPlatformFeeRate:params.platformFeeRate;
-  const customer=pricingCustomerShipping(weight,sale,null,platform),fee=sale*feeRate,gross=sale+customer;
-  const profit=gross-productCost-domestic-ship-fee;return {gross,profit,margin:gross?profit/gross:null,customer,ship,productCost,domestic,fee};
+  const customer=pricingCustomerShipping(c.weight,sale,null,platform),fee=sale*feeRate,gross=sale+customer;
+  const profit=gross-c.productCost-c.domestic-c.ship-fee;
+  return {gross,profit,margin:gross?profit/gross:null,customer,ship:c.ship,productCost:c.productCost,domestic:c.domestic,fee};
 }
 function pricingMarginAtPrice(p,salePrice,platform='rakuten'){return pricingFinancialAtPrice(p,salePrice,platform)?.margin??null}
 function pricingBaseRows(){
