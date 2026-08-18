@@ -128,15 +128,22 @@ function calcSuggestedPlatform(j,k,o,weight,feeRate,targetRate,freeShippingTWD){
   const candidate=((n(j)+n(k)+n(o))-ship*(1-target))/denom;
   return round(candidate>=n(freeShippingTWD)?(n(j)+n(k)+n(o))/denom:candidate);
 }
-function platformFinancial(salePrice,weight,productCost,domestic,fixed,feeRate,targetRate,freeShippingTWD){
-  const suggested=calcSuggestedPlatform(productCost,domestic,fixed,weight,feeRate,targetRate,freeShippingTWD);
-  const sale=salePrice!==null&&salePrice!==undefined&&Number.isFinite(Number(salePrice))?n(salePrice):suggested;
-  if(sale===null||sale===undefined)return {sale:null,suggested,customer:null,gross:null,fee:null,profit:null,margin:null};
+// 共用平台損益核心：商品資料庫、商品編輯與定價試算統一使用相同算法。
+// 客收運費＝訂單重量無條件進位至整公斤 × 客收運費/公斤；達免運門檻則為 0。
+// 平台費目前只按商品售價計算。
+function financialAtPrice(salePrice,weight,productCost,domestic,fixed,feeRate,freeShippingTWD){
+  const sale=salePrice!==null&&salePrice!==undefined&&Number.isFinite(Number(salePrice))?n(salePrice):null;
+  if(sale===null)return {sale:null,customer:null,gross:null,fee:null,profit:null,margin:null};
   const customer=sale>=n(freeShippingTWD)?0:ceilKg(weight)*params.customerShippingPerKgTWD;
   const gross=sale+customer;
   const fee=sale*n(feeRate);
-  const profit=typeof fixed==='number'?gross-fee-fixed-n(productCost)-n(domestic):null;
-  return {sale,suggested,customer,gross,fee,profit,margin:gross&&profit!==null?profit/gross:null};
+  const profit=typeof fixed==='number'?gross-fee-n(fixed)-n(productCost)-n(domestic):null;
+  return {sale,customer,gross,fee,profit,margin:gross&&profit!==null?profit/gross:null};
+}
+function platformFinancial(salePrice,weight,productCost,domestic,fixed,feeRate,targetRate,freeShippingTWD){
+  const suggested=calcSuggestedPlatform(productCost,domestic,fixed,weight,feeRate,targetRate,freeShippingTWD);
+  const sale=salePrice!==null&&salePrice!==undefined&&Number.isFinite(Number(salePrice))?n(salePrice):suggested;
+  return {...financialAtPrice(sale,weight,productCost,domestic,fixed,feeRate,freeShippingTWD),suggested};
 }
 function compute(base){
   const p={...base},ov=p.overrides||{},price=n(p.priceJPY),weight=n(p.weightG),store=getStore(p);
@@ -1639,9 +1646,9 @@ function pricingSuggested(p,targetOverride=null,platform='rakuten'){
 function pricingFinancialAtPrice(p,salePrice,platform='rakuten'){
   const c=pricingCostInputs(p),sale=n(salePrice);if(!c||!sale)return null;
   const feeRate=platform==='rianyou'?params.rianyouPlatformFeeRate:params.platformFeeRate;
-  const customer=pricingCustomerShipping(c.weight,sale,null,platform),fee=sale*feeRate,gross=sale+customer;
-  const profit=gross-c.productCost-c.domestic-c.ship-fee;
-  return {gross,profit,margin:gross?profit/gross:null,customer,ship:c.ship,productCost:c.productCost,domestic:c.domestic,fee};
+  const freeThreshold=pricingFreeShipping(platform);
+  const f=financialAtPrice(sale,c.weight,c.productCost,c.domestic,c.ship,feeRate,freeThreshold);
+  return {...f,ship:c.ship,productCost:c.productCost,domestic:c.domestic};
 }
 function pricingMarginAtPrice(p,salePrice,platform='rakuten'){return pricingFinancialAtPrice(p,salePrice,platform)?.margin??null}
 function pricingBaseRows(){
