@@ -897,8 +897,8 @@ async function importPartialProductUpdate(raw,file,selectedPlatform){
 
   const hasSpec=raw.some(row=>findHeader(row,specAliases)!==null);
   const hasProduct=raw.some(row=>findHeader(row,productAliases)!==null);
-  if(!hasSpec||!hasProduct){
-    throw new Error('指定欄位更新必須同時包含【商品規格管理編號】與【商品管理編號】');
+  if(!hasSpec){
+    throw new Error('指定欄位更新至少必須包含【商品規格管理編號】；【商品管理編號】可選填，若提供會用來做一致性檢查');
   }
 
   const detectedFields=PARTIAL_PRODUCT_UPDATE_FIELDS.filter(def=>
@@ -923,8 +923,8 @@ async function importPartialProductUpdate(raw,file,selectedPlatform){
     const spec=cleanText(partialRawValue(row,specAliases));
     const productId=cleanText(partialRawValue(row,productAliases));
     if(!spec&&!productId){blankSkipped++;continue}
-    if(!spec||!productId){
-      errors.push(`第 ${i+2} 列：商品規格管理編號與商品管理編號不可缺一`);
+    if(!spec){
+      errors.push(`第 ${i+2} 列：缺少商品規格管理編號`);
       continue;
     }
 
@@ -933,7 +933,7 @@ async function importPartialProductUpdate(raw,file,selectedPlatform){
       errors.push(`第 ${i+2} 列：找不到商品規格管理編號「${spec}」`);
       continue;
     }
-    if(cleanText(old.productManagementId).toLowerCase()!==productId.toLowerCase()){
+    if(productId&&cleanText(old.productManagementId).toLowerCase()!==productId.toLowerCase()){
       errors.push(`第 ${i+2} 列：編號不一致；${spec} 目前對應「${old.productManagementId||''}」，CSV 為「${productId}」`);
       continue;
     }
@@ -975,13 +975,15 @@ async function importPartialProductUpdate(raw,file,selectedPlatform){
 
     if(!changed){blankSkipped++;continue}
 
-    // V1.3：日幣金額是來源，不再從台幣售價反推日幣。
-    // 更新日幣金額後，清除兩平台售價的自動計算覆寫，讓系統依各平台 Params 重新試算；
-    // 若 CSV 明確提供某平台台幣售價，則該平台保留手動覆寫。
+    // V1.3.4：日幣售價是成本來源。部分更新 priceJPY 時：
+    // 1) 清除「商品成本(TWD)」手動覆寫，讓成本依新日幣售價 × 商品成本匯率重新計算；
+    // 2) 保留既有樂天／日安目前台幣售價，不因校正日幣售價而被改寫或清空；
+    // 3) 若匯入檔明確提供台幣售價，才更新該平台售價。
     const nextOverrides={...(old.overrides||{})};
     if(Object.prototype.hasOwnProperty.call(patch,'priceJPY')){
-      delete nextOverrides.manualPriceTWD;
-      delete nextOverrides.rianyouPriceTWD;
+      delete nextOverrides.productCostTWD;
+      // 清掉舊的商品成本值本身，避免後續維護時誤判為人工成本；compute 會即時重算。
+      patch.productCostTWD=null;
     }
     if(Object.prototype.hasOwnProperty.call(patch,'manualPriceTWD'))nextOverrides.manualPriceTWD=true;
     if(Object.prototype.hasOwnProperty.call(patch,'rianyouPriceTWD'))nextOverrides.rianyouPriceTWD=true;

@@ -157,9 +157,9 @@
             <div class="import-controls">
               <input id="excelFile" type="file" accept=".xlsx,.xls,.csv">
               <select id="productImportStrategy" title="商品主檔匯入方式">
+                <option value="partial" selected>指定欄位更新（建議｜空白不修改）</option>
                 <option value="fast">快速建立商品主檔（10筆/批）</option>
                 <option value="full">完整更新模式（10筆/批）</option>
-                <option value="partial">指定欄位更新（空白不修改）</option>
               </select>
               <select id="importMode">
                 <option value="upsert">相同規格編號：更新</option>
@@ -169,8 +169,8 @@
             </div>
             <div id="partialProductUpdateHelp" class="import-rule-box hidden">
               <h3>指定欄位更新</h3>
-              <p class="muted">CSV / Excel 必須同時包含【商品規格管理編號】與【商品管理編號】。系統會先以商品規格管理編號找到商品，再確認商品管理編號一致；只有有填值的欄位才覆蓋，空白欄位保持原資料不變。</p>
-              <p class="muted">可更新：商品標題、規格1～3、備註、台灣樂天URL、日安URL、日本URL、RTWBase SKU、日幣售價、樂天台幣售價、日安台幣售價、重量、上架狀態、頁面檢視、銷售商品數、銷售訂單數。更新日幣售價後，系統會依兩平台 Params 重新計算成本、建議售價與利潤；不再由台幣售價反推日幣。</p>
+              <p class="muted">CSV / Excel 至少需要【商品規格管理編號】作為更新鍵；【商品管理編號】可選填，若提供則會額外檢查一致性。只有檔案中實際存在且該列有填值的欄位才更新；未提供的欄位與空白儲存格都保留 Firebase 原資料，不會被清空。</p>
+              <p class="muted">可更新：商品標題、規格1～3、備註、台灣樂天URL、日安URL、日本URL、RTWBase SKU、日幣售價、樂天台幣售價、日安台幣售價、重量、上架狀態、頁面檢視、銷售商品數、銷售訂單數。若只校正日幣售價，只需提供【商品規格管理編號】＋【日幣售價(JPY)】兩欄。更新後商品成本會依新日幣售價重新計算，但既有台幣售價與其他商品資料會保留。</p>
             </div>
             <div class="import-rule-box">
               <h3>台灣樂天｜全店訪問報告（獨立匯入）</h3>
