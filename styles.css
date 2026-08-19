@@ -110,3 +110,8 @@ dialog{border-radius:12px}
 
 /* V1.2.33 商品分析 CSV 可視化讀取 / 寫入進度 */
 .file-progress{margin-top:12px;padding:12px 14px;border:1px solid #dbe5f0;border-radius:10px;background:#f8fbff}.file-progress.hidden{display:none}.file-progress-head{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:13px;color:#294869}.file-progress-head strong{font-variant-numeric:tabular-nums}.file-progress-track{height:9px;margin-top:9px;background:#e6edf5;border-radius:999px;overflow:hidden}.file-progress-bar{height:100%;background:linear-gradient(90deg,#4d7cff,#52a7ff);border-radius:999px;transition:width .18s ease}.file-progress-detail{margin-top:7px;min-height:17px;font-size:12px;color:#6b7a90;line-height:1.4}
+
+
+/* v1.3.6 promotion feasibility */
+.danger-text{color:#b42318!important;font-weight:700}.promotion-danger-row{background:#fff1f0!important}.promotion-danger-row:hover{background:#ffe4e1!important}
+#discountDialog{width:min(1500px,96vw);max-width:96vw}#discountDialog .discount-table-wrap{max-height:58vh}.discount-controls select{min-height:40px;border:1px solid var(--border,#d0d5dd);border-radius:8px;padding:0 10px;background:#fff}.discount-summary .danger-text{color:#b42318!important}
