@@ -1892,8 +1892,83 @@ $('tableBody').addEventListener('change',e=>{const id=e.target.dataset.selectPro
 $('tableHead').addEventListener('change',e=>{if(e.target.id!=='selectPageCheckbox')return;const list=filtered().slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);list.forEach(p=>e.target.checked?selectedProductIds.add(p.id):selectedProductIds.delete(p.id));renderTable();updateSelectionCount()});
 $('tableBody').addEventListener('click',async e=>{const id=e.target.dataset.edit||e.target.dataset.delete;if(!id)return;if(e.target.dataset.edit){renderProductForm(products.find(p=>p.id===id));$('productDialog').showModal()}else if(confirm('確定刪除此商品？')){await deleteDoc(doc(db,'products',id));await loadAll();toast('已刪除')}});
 function resetParamsProgress(){const panel=$('paramsProgressPanel'),track=panel?.querySelector('[role="progressbar"]');panel?.classList.remove('is-done','is-error');if($('paramsProgressBar'))$('paramsProgressBar').style.width='0%';if(track)track.setAttribute('aria-valuenow','0');if($('paramsProgressPercent'))$('paramsProgressPercent').textContent='0%';if($('paramsProgressCount'))$('paramsProgressCount').textContent=`0 / ${products.length}`;if($('paramsProgressSku'))$('paramsProgressSku').textContent='—';if($('paramsProgressTime'))$('paramsProgressTime').textContent='—';if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='待機'}
-async function runParamsRecalcProgress(){const panel=$('paramsProgressPanel'),track=panel?.querySelector('[role="progressbar"]'),total=products.length,start=performance.now();panel?.classList.remove('is-done','is-error');if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='重新計算中…';if(!total){if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='完成（無商品）';panel?.classList.add('is-done');return}for(let i=0;i<total;i+=50){const end=Math.min(i+50,total),current=products[end-1];for(let j=i;j<end;j++)compute(products[j]);const pct=Math.round(end/total*100);if($('paramsProgressBar'))$('paramsProgressBar').style.width=pct+'%';if(track)track.setAttribute('aria-valuenow',String(pct));if($('paramsProgressPercent'))$('paramsProgressPercent').textContent=pct+'%';if($('paramsProgressCount'))$('paramsProgressCount').textContent=`${end} / ${total}`;if($('paramsProgressSku'))$('paramsProgressSku').textContent=current?.specManagementId||current?.productManagementId||current?.id||'—';if($('paramsProgressTime'))$('paramsProgressTime').textContent=((performance.now()-start)/1000).toFixed(1)+' 秒';await new Promise(requestAnimationFrame)}panel?.classList.add('is-done');if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='計算完成 ✓'}
-$('openParamsBtn').onclick=()=>{resetParamsProgress();$('paramsDialog').showModal()};$('paramsForm').addEventListener('submit',async e=>{e.preventDefault();const btn=e.currentTarget.querySelector('button[type="submit"]');if(btn)btn.disabled=true;try{if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='儲存參數中…';const fd=new FormData(e.currentTarget),next={};PARAM_DEFS.forEach(([k])=>next[k]=Number(fd.get(k)));next.tiers=params.tiers.map((_,i)=>[Number(fd.get(`tierMax_${i}`)),Number(fd.get(`tierFee_${i}`))]).sort((a,b)=>a[0]-b[0]);await setDoc(doc(db,'settings','params'),{...next,updatedAt:serverTimestamp()});params={...params,...next};await runParamsRecalcProgress();await loadAll();$('paramsProgressPanel')?.classList.add('is-done');if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='計算完成 ✓';toast('參數已更新並重新計算完成')}catch(err){console.error(err);$('paramsProgressPanel')?.classList.add('is-error');if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='計算失敗';toast('參數更新失敗，請再試一次')}finally{if(btn)btn.disabled=false}});
+function createParamsProgressController(total){
+  const panel=$('paramsProgressPanel'),track=panel?.querySelector('[role="progressbar"]'),start=performance.now();
+  let done=false,current=0,timer=null;
+  panel?.classList.remove('is-done','is-error');
+  if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='重新計算中…';
+  const update=(pct,count,label='—')=>{
+    const safePct=Math.max(0,Math.min(100,Math.round(pct)));
+    if($('paramsProgressBar'))$('paramsProgressBar').style.width=safePct+'%';
+    if(track)track.setAttribute('aria-valuenow',String(safePct));
+    if($('paramsProgressPercent'))$('paramsProgressPercent').textContent=safePct+'%';
+    if($('paramsProgressCount'))$('paramsProgressCount').textContent=`${Math.min(count,total)} / ${total}`;
+    if($('paramsProgressSku'))$('paramsProgressSku').textContent=label;
+    if($('paramsProgressTime'))$('paramsProgressTime').textContent=((performance.now()-start)/1000).toFixed(1)+' 秒';
+  };
+  update(0,0,'準備重新載入');
+  timer=setInterval(()=>{
+    if(done)return;
+    // 進度條僅反映重新載入進度，不直接操作商品計算。
+    // 在 loadAll() 完成前最多跑到 92%，完成時再一次到 100%。
+    current=Math.min(92,current+Math.max(1,Math.ceil((92-current)*0.12)));
+    const estimatedCount=total?Math.floor(total*current/100):0;
+    update(current,estimatedCount,'重新載入商品資料');
+  },120);
+  return {
+    finish(){
+      done=true;
+      if(timer)clearInterval(timer);
+      update(100,total,'全部完成');
+      panel?.classList.add('is-done');
+      if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='計算完成 ✓';
+    },
+    fail(message='計算失敗'){
+      done=true;
+      if(timer)clearInterval(timer);
+      panel?.classList.add('is-error');
+      if($('paramsProgressStatus'))$('paramsProgressStatus').textContent=message;
+    }
+  };
+}
+$('openParamsBtn').onclick=()=>{resetParamsProgress();$('paramsDialog').showModal()};$('paramsForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=e.currentTarget.querySelector('button[type="submit"]');
+  if(btn)btn.disabled=true;
+  const total=products.length;
+  let progress=null;
+  try{
+    if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='儲存參數中…';
+    const fd=new FormData(e.currentTarget),next={};
+    PARAM_DEFS.forEach(([k])=>next[k]=Number(fd.get(k)));
+    next.tiers=params.tiers.map((_,i)=>[
+      Number(fd.get(`tierMax_${i}`)),
+      Number(fd.get(`tierFee_${i}`))
+    ]).sort((a,b)=>a[0]-b[0]);
+
+    await setDoc(doc(db,'settings','params'),{...next,updatedAt:serverTimestamp()});
+    params={...params,...next};
+
+    progress=createParamsProgressController(total);
+
+    // 沿用系統原本完整的載入與重算流程。
+    // 不再由進度條逐筆呼叫 compute()，避免 0% 直接失敗。
+    await loadAll();
+
+    progress.finish();
+    toast('參數已更新並重新計算完成');
+  }catch(err){
+    console.error('參數更新/重算失敗：',err);
+    progress?.fail('計算失敗');
+    if(!progress){
+      $('paramsProgressPanel')?.classList.add('is-error');
+      if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='計算失敗';
+    }
+    toast('參數更新失敗：'+(err?.message||'請再試一次'));
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+});params={...params,...next};await runParamsRecalcProgress();await loadAll();$('paramsProgressPanel')?.classList.add('is-done');if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='計算完成 ✓';toast('參數已更新並重新計算完成')}catch(err){console.error(err);$('paramsProgressPanel')?.classList.add('is-error');if($('paramsProgressStatus'))$('paramsProgressStatus').textContent='計算失敗';toast('參數更新失敗，請再試一次')}finally{if(btn)btn.disabled=false}});
 $('columnBtn').onclick=()=>{renderColumns();$('columnsDialog').showModal()};$('columnOptions').addEventListener('change',()=>{const next=[...$('columnOptions').querySelectorAll('input:checked')].map(x=>x.value);if(currentView==='crossPlatform'){crossVisibleColumns=next;localStorage.setItem('crossVisibleColumns',JSON.stringify(crossVisibleColumns));renderCrossPlatform()}else if(currentView==='sales'){salesVisibleColumns=next;localStorage.setItem('salesVisibleColumns',JSON.stringify(salesVisibleColumns));renderTable()}else{visibleColumns=next;localStorage.setItem('visibleColumns',JSON.stringify(visibleColumns));renderTable()}});$('selectDefaultColumns').onclick=()=>{if(currentView==='crossPlatform'){crossVisibleColumns=CROSS_COLUMN_DEFS.map(x=>x[0]);localStorage.setItem('crossVisibleColumns',JSON.stringify(crossVisibleColumns));renderColumns();renderCrossPlatform()}else if(currentView==='sales'){salesVisibleColumns=[...SALES_COLUMNS];localStorage.setItem('salesVisibleColumns',JSON.stringify(salesVisibleColumns));renderColumns();renderTable()}else{visibleColumns=[...DEFAULT_COLUMNS];localStorage.setItem('visibleColumns',JSON.stringify(visibleColumns));renderColumns();renderTable()}};
 $('productImportStrategy')?.addEventListener('change',()=>{
   $('partialProductUpdateHelp')?.classList.toggle('hidden',$('productImportStrategy').value!=='partial');
