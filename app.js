@@ -277,7 +277,15 @@ async function loadAll(){
   try{await ensurePlatforms()}catch(e){console.error('ensurePlatforms failed',e)}
   try{
     const setting=await getDoc(doc(db,'settings','params'));
-    params=setting.exists()?{...DEFAULT_PARAMS,...setting.data()}:structuredClone(DEFAULT_PARAMS);
+    if(setting.exists()){
+      const raw=setting.data();
+      const normalizedTiers=Array.isArray(raw.tiers)
+        ? raw.tiers.map(t=>Array.isArray(t)?t:[Number(t?.max),Number(t?.fee)]).filter(t=>Number.isFinite(t[0])&&Number.isFinite(t[1]))
+        : structuredClone(DEFAULT_PARAMS.tiers);
+      params={...DEFAULT_PARAMS,...raw,tiers:normalizedTiers.length?normalizedTiers:structuredClone(DEFAULT_PARAMS.tiers)};
+    }else{
+      params=structuredClone(DEFAULT_PARAMS);
+    }
   }catch(e){console.error('params load failed',e);params=structuredClone(DEFAULT_PARAMS)}
   try{await loadStores()}catch(e){console.error('stores load failed',e);stores=[];storeMap=new Map()}
   products=(await safeCollectionDocs('products')).map(compute);
@@ -1993,7 +2001,11 @@ $('openParamsBtn').onclick=()=>{resetParamsProgress();$('paramsDialog').showModa
 
     // 先更新記憶體參數，再儲存 Firebase。
     params={...params,...next};
-    await setDoc(doc(db,'settings','params'),{...next,updatedAt:serverTimestamp()});
+    const firestoreParams={...next,
+      tiers:next.tiers.map(([max,fee])=>({max,fee})),
+      updatedAt:serverTimestamp()
+    };
+    await setDoc(doc(db,'settings','params'),firestoreParams);
 
     // 只重算商品，不重新下載 sales/orders/traffic，避免不必要的 loadAll() 失敗。
     await recalcProductsWithProgress();
