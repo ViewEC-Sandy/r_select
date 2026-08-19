@@ -1903,88 +1903,112 @@ function resetParamsProgress(){
   if($('paramsProgressSku')) $('paramsProgressSku').textContent='—';
   if($('paramsProgressTime')) $('paramsProgressTime').textContent='—';
   if($('paramsProgressStatus')) $('paramsProgressStatus').textContent='待機';
+  if($('paramsProgressError')){
+    $('paramsProgressError').textContent='';
+    $('paramsProgressError').classList.add('hidden');
+  }
 }
 
-function startParamsProgress(total){
+function setParamsProgress(done,total,sku,startTime,status='重新計算中…'){
   const panel=$('paramsProgressPanel');
   const track=panel?.querySelector('[role="progressbar"]');
+  const pct=total?Math.round(done/total*100):100;
+  if($('paramsProgressBar')) $('paramsProgressBar').style.width=pct+'%';
+  if(track) track.setAttribute('aria-valuenow',String(pct));
+  if($('paramsProgressPercent')) $('paramsProgressPercent').textContent=pct+'%';
+  if($('paramsProgressCount')) $('paramsProgressCount').textContent=`${done} / ${total}`;
+  if($('paramsProgressSku')) $('paramsProgressSku').textContent=sku||'—';
+  if($('paramsProgressTime')) $('paramsProgressTime').textContent=((performance.now()-startTime)/1000).toFixed(1)+' 秒';
+  if($('paramsProgressStatus')) $('paramsProgressStatus').textContent=status;
+}
+
+async function recalcProductsWithProgress(){
+  const total=products.length;
   const started=performance.now();
-  let pct=0;
-  let timer=null;
+  const source=[...products];
+  const result=new Array(total);
+  const batchSize=50;
 
-  const paint=(value,label)=>{
-    pct=Math.max(0,Math.min(100,Math.round(value)));
-    const count=total ? Math.floor(total*pct/100) : 0;
-    if($('paramsProgressBar')) $('paramsProgressBar').style.width=pct+'%';
-    if(track) track.setAttribute('aria-valuenow',String(pct));
-    if($('paramsProgressPercent')) $('paramsProgressPercent').textContent=pct+'%';
-    if($('paramsProgressCount')) $('paramsProgressCount').textContent=`${Math.min(count,total)} / ${total}`;
-    if($('paramsProgressSku')) $('paramsProgressSku').textContent=label||'重新載入商品資料';
-    if($('paramsProgressTime')) $('paramsProgressTime').textContent=((performance.now()-started)/1000).toFixed(1)+' 秒';
-  };
+  if(!total){
+    setParamsProgress(0,0,'—',started,'計算完成 ✓');
+    $('paramsProgressPanel')?.classList.add('is-done');
+    return;
+  }
 
-  panel?.classList.remove('is-done','is-error');
-  if($('paramsProgressStatus')) $('paramsProgressStatus').textContent='重新計算中…';
-  paint(0,'準備重新載入');
-
-  timer=setInterval(()=>{
-    if(pct<92) paint(Math.min(92,pct+Math.max(1,Math.ceil((92-pct)*0.12))),'重新載入商品資料');
-  },120);
-
-  return {
-    finish(){
-      if(timer) clearInterval(timer);
-      if($('paramsProgressBar')) $('paramsProgressBar').style.width='100%';
-      if(track) track.setAttribute('aria-valuenow','100');
-      if($('paramsProgressPercent')) $('paramsProgressPercent').textContent='100%';
-      if($('paramsProgressCount')) $('paramsProgressCount').textContent=`${total} / ${total}`;
-      if($('paramsProgressSku')) $('paramsProgressSku').textContent='全部完成';
-      if($('paramsProgressTime')) $('paramsProgressTime').textContent=((performance.now()-started)/1000).toFixed(1)+' 秒';
-      panel?.classList.add('is-done');
-      if($('paramsProgressStatus')) $('paramsProgressStatus').textContent='計算完成 ✓';
-    },
-    fail(){
-      if(timer) clearInterval(timer);
-      panel?.classList.add('is-error');
-      if($('paramsProgressStatus')) $('paramsProgressStatus').textContent='計算失敗';
+  for(let i=0;i<total;i+=batchSize){
+    const end=Math.min(i+batchSize,total);
+    for(let j=i;j<end;j++){
+      try{
+        result[j]=compute(source[j]);
+      }catch(err){
+        const sku=source[j]?.specManagementId||source[j]?.productManagementId||source[j]?.id||`第 ${j+1} 筆`;
+        throw new Error(`${sku}：${err?.message||String(err)}`);
+      }
     }
-  };
+    const current=source[end-1];
+    const sku=current?.specManagementId||current?.productManagementId||current?.id||'—';
+    setParamsProgress(end,total,sku,started);
+    await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+  }
+
+  products=result;
+  renderAll();
+  renderParams();
+  if(currentView==='overview') renderOverview();
+  else if(currentView==='pricing') renderPricingPage();
+  else if(currentView==='platformCompare') renderPlatformCompare();
+  else if(currentView==='crossPlatform') renderCrossPlatform();
+
+  setParamsProgress(total,total,'全部完成',started,'計算完成 ✓');
+  $('paramsProgressPanel')?.classList.add('is-done');
 }
 
 $('openParamsBtn').onclick=()=>{resetParamsProgress();$('paramsDialog').showModal()};$('paramsForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const btn=e.currentTarget.querySelector('button[type="submit"]');
   if(btn) btn.disabled=true;
-  const total=products.length;
-  let progress=null;
+
   try{
+    resetParamsProgress();
     if($('paramsProgressStatus')) $('paramsProgressStatus').textContent='儲存參數中…';
 
     const fd=new FormData(e.currentTarget);
     const next={};
-    PARAM_DEFS.forEach(([k])=>next[k]=Number(fd.get(k)));
+
+    PARAM_DEFS.forEach(([k])=>{
+      const raw=fd.get(k);
+      const value=Number(raw);
+      if(!Number.isFinite(value)) throw new Error(`參數「${k}」不是有效數字`);
+      next[k]=value;
+    });
+
     next.tiers=params.tiers
-      .map((_,i)=>[Number(fd.get(`tierMax_${i}`)),Number(fd.get(`tierFee_${i}`))])
+      .map((_,i)=>{
+        const max=Number(fd.get(`tierMax_${i}`));
+        const fee=Number(fd.get(`tierFee_${i}`));
+        if(!Number.isFinite(max)||!Number.isFinite(fee)) throw new Error(`新日誠第 ${i+1} 個級距不是有效數字`);
+        return [max,fee];
+      })
       .sort((a,b)=>a[0]-b[0]);
 
-    await setDoc(doc(db,'settings','params'),{...next,updatedAt:serverTimestamp()});
+    // 先更新記憶體參數，再儲存 Firebase。
     params={...params,...next};
+    await setDoc(doc(db,'settings','params'),{...next,updatedAt:serverTimestamp()});
 
-    progress=startParamsProgress(total);
+    // 只重算商品，不重新下載 sales/orders/traffic，避免不必要的 loadAll() 失敗。
+    await recalcProductsWithProgress();
 
-    // 沿用原本的完整重載/重算流程；進度條本身不直接呼叫 compute()
-    await loadAll();
-
-    progress.finish();
     toast('參數已更新並重新計算完成');
   }catch(err){
-    console.error('參數更新或重新計算失敗：',err);
-    progress?.fail();
-    if(!progress){
-      $('paramsProgressPanel')?.classList.add('is-error');
-      if($('paramsProgressStatus')) $('paramsProgressStatus').textContent='計算失敗';
+    console.error('計算參數失敗：',err);
+    const panel=$('paramsProgressPanel');
+    panel?.classList.add('is-error');
+    if($('paramsProgressStatus')) $('paramsProgressStatus').textContent='計算失敗';
+    if($('paramsProgressError')){
+      $('paramsProgressError').textContent=`錯誤原因：${err?.message||String(err)}`;
+      $('paramsProgressError').classList.remove('hidden');
     }
-    toast('參數更新失敗：'+(err?.message||'請再試一次'));
+    toast('參數更新失敗：'+(err?.message||'請查看錯誤原因'));
   }finally{
     if(btn) btn.disabled=false;
   }
