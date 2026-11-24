@@ -144,3 +144,66 @@ body[data-view=products] .stat:has(#statUnits),body[data-view=sales] :is(#select
 .pagination,.pricing-summary,.params-progress-track,.health-grid span,.discount-summary span{background:#1b2939;color:#dce7f4}
 .excel-filter-button,.pricing-head-row .excel-filter-button{background:#253649;color:#a9c7e8}
 .danger-text,.discount-summary .danger-text{color:#ff9a90!important}
+
+/* R-Select dark contrast · start */
+:root {
+  --rs-control: #192a3c;
+  --rs-heading: #24384d;
+  --rs-line: #647d98;
+  --rs-label: #d3e1ef;
+  --rs-value: #f1f6fc;
+  --rs-focus: #91caff;
+}
+:is(#appView,dialog) table thead tr th {
+  background:var(--rs-heading)!important;
+  color:var(--rs-value)!important;
+  border-bottom-color:var(--rs-line);
+}
+:is(#appView,dialog) thead :is(.excel-header,.excel-header>span) {
+  background:transparent!important;color:var(--rs-value)!important;
+}
+:is(#tableHead,#tableBody) tr.group-head>th {
+  background:#192c40!important;color:#abd5ff!important;
+}
+:is(#appView,dialog) .excel-filter-button {
+  background:#162738!important;color:#e5f2ff!important;border:1px solid var(--rs-line);
+}
+:is(#appView,dialog) .excel-filter-button:is(:hover,:focus-visible,.active) {
+  background:#245d99!important;color:white!important;border-color:var(--rs-focus);
+}
+:is(#appView,#loginView,dialog,.excel-filter-menu) :is(label,legend) {
+  color:var(--rs-label)!important;
+}
+:is(#appView,#loginView,dialog,.excel-filter-menu)
+:is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea) {
+  color-scheme:dark;background:var(--rs-control)!important;
+  color:var(--rs-value)!important;border:1px solid var(--rs-line)!important;
+}
+:is(#appView,#loginView,dialog,.excel-filter-menu) select option {
+  background:var(--rs-control);color:var(--rs-value);
+}
+:is(#appView,#loginView,dialog,.excel-filter-menu) ::placeholder {
+  color:#afc0d2!important;opacity:1;
+}
+:is(#appView,#loginView,dialog,.excel-filter-menu) :is(button,input,select,textarea):focus-visible {
+  outline:2px solid var(--rs-focus);outline-offset:2px;
+}
+:is(#appView,dialog) :is(input[type=checkbox],input[type=radio]) {
+  color-scheme:dark;accent-color:#79baff;
+}
+:is(#productDialog,#paramsDialog) :is(input,textarea)[readonly] {
+  background:#253342!important;color:#d5e1ed!important;
+}
+#maintenanceDialog .danger-zone {
+  background:#351e26!important;color:#ffe7ec!important;border:1px solid #b76e7a!important;
+}
+#maintenanceDialog .danger-zone :is(h2,h3,label,p,strong,small) {
+  color:#ffe3e8!important;
+}
+#maintenanceDialog .danger-zone button {
+  background:#a52b39!important;color:white!important;border:1px solid #e68a96;
+}
+#maintenanceDialog .danger-zone button:disabled {
+  background:#51353b!important;color:#d9c7ca!important;opacity:1;
+}
+/* R-Select dark contrast · end */
