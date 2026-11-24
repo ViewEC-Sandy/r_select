@@ -124,3 +124,23 @@ dialog{border-radius:12px}
 .params-progress-panel.is-error .params-progress-bar{background:#dc2626}
 .params-progress-meta{font-size:12px;color:#667085}
 .params-progress-error{margin-top:10px;padding:9px 10px;border-radius:8px;background:#fef2f2;color:#b42318;font-size:12px;white-space:pre-wrap}
+
+/* R-Select operations workspace */
+:root{color-scheme:dark;--page-bg:#0b111a;--panel:#131d29;--sidebar:#0b121b;--enterprise-text:#e6effb;--enterprise-border:#2a3748;--border:#304053;--primary:#346cb9;--muted:#a1b2c7}
+body,.enterprise-shell{background:var(--page-bg);color:var(--enterprise-text)}
+.sidebar{background:#0d141d}.enterprise-header{background:#101924}.enterprise-header small,.url-link{color:#86bbff}.side-nav-item.active{background:#1b324c;box-shadow:inset 3px 0 #66adff}
+.card,.enterprise-main .card,.center-card,dialog,.toolbar,.excel-filter-menu,.params-progress-panel,.file-progress,.health-box,.import-card,.platform-editor{background:var(--panel);color:var(--enterprise-text);border-color:var(--border)}
+.enterprise-header .header-actions button,button.secondary,input,select,textarea,.toolbar input,.toolbar select,.excel-filter-menu button,.discount-controls select{background:#192738;color:#e1eaf7;border-color:var(--border)}
+thead th,th,.group-head th,.table-wrap th{background:#1c2c3c;color:#bdd1e6}.group-head th{color:#8cbcfa;text-align:left;border-left:1px solid #40526a}
+tbody tr,tbody td,.table-wrap td{background:#131d29;color:#e4ecf6;border-color:#2b3948}tbody tr:hover td{background:#1b2a3b}
+.stat span,.stat strong,dialog label,.excel-header,.pricing-controls label{color:#d3e1f1}.stat{border-top:2px solid #659ff3!important}.stat:nth-child(3n+2){border-top-color:#a48ae6!important}.stat:nth-child(3n){border-top-color:#6bd2b4!important}
+[hidden]{display:none!important}.enterprise-main .overview-grid{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}.overview-grid>.card{min-width:0}.group-head th{position:static}
+#pricingView[data-platform=rakuten] .rian-trial,#pricingView[data-platform=rianyou] .rak-trial,
+#pricingView[data-platform=rakuten] .pricing-head-row th:nth-child(n+12),#pricingView[data-platform=rakuten] #pricingTableBody td:nth-child(n+12),
+#pricingView[data-platform=rianyou] .pricing-head-row th:nth-child(n+7):nth-child(-n+11),#pricingView[data-platform=rianyou] #pricingTableBody td:nth-child(n+7):nth-child(-n+11){display:none}
+body[data-view=products] .stat:has(#statUnits),body[data-view=sales] :is(#selectFilteredBtn,#clearSelectionBtn,#discountCalcBtn,#selectionCount,#statusFilter),body[data-view=sales] .stats-grid .stat:has(:is(#statActive,#statMargin,#statRianyouMargin)){display:none}
+#cartBoxPanel{margin:14px 0}#cartBoxes input{max-width:110px}.group-head th{z-index:auto}
+@media(max-width:900px){.enterprise-main .overview-grid{grid-template-columns:minmax(0,1fr)}}
+.pagination,.pricing-summary,.params-progress-track,.health-grid span,.discount-summary span{background:#1b2939;color:#dce7f4}
+.excel-filter-button,.pricing-head-row .excel-filter-button{background:#253649;color:#a9c7e8}
+.danger-text,.discount-summary .danger-text{color:#ff9a90!important}

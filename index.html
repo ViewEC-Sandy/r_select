@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>線上商品資料庫</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2.0" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
@@ -24,15 +24,13 @@
     <aside class="sidebar">
       <div class="brand-block">
         <h2>R-Select<br>Dashboard</h2>
-        <small>Product Database V1.3.11</small>
+        <small>營運工作台</small>
       </div>
       <nav class="side-nav" aria-label="主要功能">
         <button id="overviewTabBtn" type="button" class="side-nav-item">營運總覽</button>
         <button id="productTabBtn" type="button" class="side-nav-item active">商品資料庫</button>
         <button id="pricingTabBtn" type="button" class="side-nav-item">定價試算</button>
         <button id="salesTabBtn" type="button" class="side-nav-item">銷售狀態</button>
-        <button id="crossPlatformTabBtn" type="button" class="side-nav-item">商品跨平台</button>
-        <button id="platformCompareTabBtn" type="button" class="side-nav-item">平台比較</button>
         <button id="importTabBtn" type="button" class="side-nav-item">資料匯入</button>
         <div class="nav-separator"></div>
         <button id="storeManagerBtn" type="button" class="side-nav-item">店鋪管理</button>
@@ -48,7 +46,7 @@
     <div class="enterprise-shell">
       <header class="enterprise-header">
         <div>
-          <small>TAIWAN PAVILION / MULTI-PLATFORM</small>
+          <small>R-SELECT ／ OPERATIONS</small>
           <h1 id="pageTitle">商品資料庫</h1>
         </div>
         <div class="header-actions">
@@ -73,9 +71,9 @@
           <button id="addProductBtn">＋ 新增商品</button>
         </div>
         <div id="salesDateFilters" class="toolbar-row hidden">
-          <label class="sales-period">銷售開始<input id="salesFilterStart" type="date"></label>
-          <label class="sales-period">銷售結束<input id="salesFilterEnd" type="date"></label>
-          <span class="muted">銷售狀態依匯入時設定的報表期間篩選</span>
+          <label>期間<select id="ssMode"><option value="year">年度</option><option value="month">月份區間</option></select></label><label>年度<select id="ssYear"></select></label><label>起月<input id="ssFrom" type="month"></label><label>迄月<input id="ssTo" type="month"></label><label>平台<select id="salesPlatform"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label><input type="hidden" id="salesFilterStart">
+          <input type="hidden" id="salesFilterEnd">
+          <span class="muted">轉換率＝訂單數 ÷ 商品訪客數；缺少訪客數時顯示空白。</span>
         </div>
       </section>
 
@@ -96,8 +94,8 @@
 
         <section id="overviewView" class="hidden overview-page">
         <section class="card overview-toolbar">
-          <label>開始日期<input id="overviewStart" type="date"></label>
-          <label>結束日期<input id="overviewEnd" type="date"></label>
+          <label>期間<select id="ovMode"><option value="year">年度</option><option value="month">月份區間</option></select></label><label>年度<select id="ovYear"></select></label><label>起月<input id="ovFrom" type="month"></label><label>迄月<input id="ovTo" type="month"></label><input type="hidden" id="overviewStart">
+          <input type="hidden" id="overviewEnd">
           <label>平台<select id="overviewPlatform"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label>
           <button id="applyOverviewBtn" type="button">套用</button>
           <button id="resetOverviewBtn" type="button" class="secondary">全部期間</button>
@@ -116,9 +114,9 @@
         </section>
         <section class="overview-grid">
           <article class="card chart-card"><h3>銷售趨勢</h3><canvas id="salesTrendChart"></canvas></article>
-          <article class="card chart-card chart-card-wide"><h3>銷售數量 Top 10</h3><canvas id="rankingChart"></canvas></article>
+          <article class="card chart-card"><h3>平台營收占比</h3><canvas id="platformRevenueChart"></canvas></article>
         </section>
-        <section class="overview-grid extra-charts"><article class="card chart-card"><h3>流量趨勢</h3><canvas id="trafficTrendChart"></canvas><div id="trafficTrendNote" class="chart-note muted"></div></article><article class="card chart-card"><h3>平台營收占比</h3><canvas id="platformRevenueChart"></canvas></article></section>
+        <section class="overview-grid extra-charts"><article class="card chart-card"><h3>流量趨勢</h3><canvas id="trafficTrendChart"></canvas><div id="trafficTrendNote" class="chart-note muted"></div></article><article class="card"><h3>平台成效明細</h3><div class="table-wrap"><table><thead><tr><th>平台</th><th>頁面檢視總數</th><th>銷售商品數</th><th>銷售訂單數</th><th>營業額(TWD)</th><th>實收運費(TWD)</th></tr></thead><tbody id="channelDetails"></tbody></table></div></article></section>
         <section class="card ranking-card">
           <div class="section-head"><h3>商品銷售排行榜</h3><div><select id="rankingSort"><option value="units_desc">銷售數量：大到小</option><option value="units_asc">銷售數量：小到大</option><option value="revenue_desc">營業額：大到小</option><option value="revenue_asc">營業額：小到大</option><option value="orders_desc">訂單數：大到小</option><option value="price_desc">單價：大到小</option></select> <span id="rankingPeriod" class="muted"></span></div></div>
           <div class="table-wrap"><table><thead><tr><th>排名</th><th>商品規格管理編號</th><th>商品管理編號</th><th>商品名</th><th>商品單價(TWD)</th><th>銷售數量</th><th>訂單數</th><th>推估營業額(TWD)</th></tr></thead><tbody id="rankingTableBody"></tbody></table></div>
@@ -126,7 +124,7 @@
       </section>
       <section id="pricingView" class="hidden overview-page">
         <section class="card">
-          <div class="section-head"><div><h2>單件商品重新定價</h2><p class="muted">不修改商品主檔。以「客人只買 1 件」為基準，直接使用已保存的日幣售價與實際成本反推目標利潤售價；不使用舊固定倍率，也不由台幣售價回推日幣。樂天可在此頁暫時調整目標利潤率／免運門檻；日安使用商品所屬店鋪設定；店鋪未設定時使用 Params 中的日安優物預設。客收運費＝訂單總重量無條件進位至整公斤 × 每公斤客收運費（例如 150g＝1kg＝199元、1.01kg＝2kg＝398元）；若建議售價達免運門檻，客收運費改為 0 後重新反推售價。</p></div><div class="pricing-controls"><label>樂天目標利潤率(%)<input id="pricingTargetRate" type="number" min="0" max="80" step="0.1" value="30"></label><label>樂天此表單免運門檻(TWD)<input id="pricingFreeShippingTWD" type="number" min="0" step="1" value="5000"></label><input id="pricingSearch" type="search" placeholder="搜尋商品編號或名稱"><button id="pricingExportBtn" type="button" class="secondary">下載試算 Excel</button></div></div>
+          <div class="section-head"><div><h2>單件商品重新定價</h2><p class="muted">不修改商品主檔。以「客人只買 1 件」為基準，直接使用已保存的日幣售價與實際成本反推目標利潤售價；不使用舊固定倍率，也不由台幣售價回推日幣。選擇平台後調整目標利潤率與免運門檻。客收運費＝訂單總重量無條件進位至整公斤 × 每公斤客收運費（例如 150g＝1kg＝199元、1.01kg＝2kg＝398元）；若建議售價達免運門檻，客收運費改為 0 後重新反推售價。</p></div><div class="pricing-controls"><label>試算平台<select id="trialPlatform"><option value="rakuten">台灣樂天</option><option value="rianyou">日安優物</option></select></label><label class="rian-trial">日安目標利潤率(%)<input id="rianTarget" type="number" min="0" max="80" step=".1"></label><label class="rian-trial">日安免運門檻(TWD)<input id="rianThreshold" type="number" min="0"></label><label class="rak-trial">樂天目標利潤率(%)<input id="pricingTargetRate" type="number" min="0" max="80" step="0.1"></label><label class="rak-trial">樂天此表單免運門檻(TWD)<input id="pricingFreeShippingTWD" type="number" min="0" step="1"></label><input id="pricingSearch" type="search" placeholder="搜尋商品編號或名稱"><button id="pricingExportBtn" type="button" class="secondary">下載試算 Excel</button></div></div>
           <div class="pricing-kpis"><article class="card stat"><span>樂天平均利潤率</span><strong id="pricingAvgCurrentMargin">—</strong><small id="pricingAvgCurrentNote" class="muted">依目前篩選商品計算</small></article><article class="card stat"><span>日安平均利潤率</span><strong id="pricingRianyouAvgCurrentMargin">—</strong><small class="muted">依目前篩選商品計算</small></article><article class="card stat"><span>樂天參數調整後整體利潤率</span><strong id="pricingAdjustedOverallMargin">—</strong><small id="pricingAdjustedOverallNote" class="muted">依樂天建議售價彙總</small></article><article class="card stat"><span>日安參數調整後整體利潤率</span><strong id="pricingRianyouAdjustedOverallMargin">—</strong><small id="pricingRianyouAdjustedOverallNote" class="muted">依日安建議售價彙總</small></article><article class="card stat"><span>目前篩選商品數</span><strong id="pricingVisibleCount">0</strong></article></div>
           <div class="table-wrap"><table><thead><tr class="pricing-head-row"><th><div class="excel-header"><span>商品規格管理編號</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="spec">▼</button></div></th><th><div class="excel-header"><span>商品標題</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="title">▼</button></div></th><th><div class="excel-header"><span>日幣售價</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="priceJPY">▼</button></div></th><th><div class="excel-header"><span>重量(g)</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="weight">▼</button></div></th><th><div class="excel-header"><span>物流</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="method">▼</button></div></th><th><div class="excel-header"><span>單件物流成本</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="shipCost">▼</button></div></th><th><div class="excel-header"><span>樂天客收運費</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="customer">▼</button></div></th><th><div class="excel-header"><span>樂天目前售價</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="currentPrice">▼</button></div></th><th><div class="excel-header"><span>樂天目前售價利潤率</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="margin">▼</button></div></th><th><div class="excel-header"><span>樂天目標利潤建議售價</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="suggested">▼</button></div></th><th><div class="excel-header"><span>樂天調整</span><button type="button" class="excel-filter-button" data-pricing-filter-menu="diff">▼</button></div></th><th>日安客收運費</th><th>日安目前售價</th><th>日安目前售價利潤率</th><th>日安目標利潤建議售價</th><th>日安調整</th></tr></thead><tbody id="pricingTableBody"></tbody></table></div>
         </section>
@@ -134,7 +132,7 @@
           <div class="section-head"><div><h2>多件訂單組合試算</h2><p class="muted">商品售價不重新計算；將所有商品重量合計後，只計算一次實際物流，並同時計算樂天與日安優物整張訂單的利潤率。</p></div></div>
           <div class="pricing-add-row"><input id="pricingSpecInput" type="text" placeholder="輸入商品規格管理編號"><input id="pricingQty" type="number" min="1" step="1" value="1"><button id="pricingAddBtn" type="button">加入試算</button><button id="pricingClearBtn" type="button" class="secondary">清空</button></div><div id="pricingAddMsg" class="muted"></div>
           <div class="table-wrap"><table><thead><tr><th>商品</th><th>樂天單價(TWD)</th><th>日安單價(TWD)</th><th>重量(g)</th><th>數量</th><th>樂天小計</th><th>日安小計</th><th></th></tr></thead><tbody id="pricingCartBody"></tbody></table></div>
-          <div id="pricingSummary" class="pricing-summary muted">請先加入商品。</div>
+          <section id="cartBoxPanel" hidden><h3>海運出貨箱</h3><p class="muted">預設每件海運商品獨立出箱。若合箱，請依最終出貨箱新增列並填寫包裝後毛重與尺寸；非海運商品另計。</p><div id="cartBoxes"></div><button type="button" id="addSeaBox">新增實際出貨箱</button></section><div id="pricingSummary" class="pricing-summary muted">請先加入商品。</div>
         </section>
       </section>
       <section id="crossPlatformView" class="hidden overview-page"><section class="card"><div class="section-head"><h2>商品跨平台</h2><div class="period-filter"><label>開始日期<input id="crossStart" type="date"></label><label>結束日期<input id="crossEnd" type="date"></label><label>平台<select id="crossPlatformFilter"><option value="all">全部平台</option><option value="taiwan_rakuten">台灣樂天</option><option value="rianyou_shopify">日安優物 Shopline</option></select></label></div></div><div class="overview-kpis"><article class="card stat"><span>篩選營收總計</span><strong id="crossRevenue">0</strong></article><article class="card stat"><span>已收運費</span><strong id="crossShipping">0</strong></article><article class="card stat"><span>篩選銷量總計</span><strong id="crossUnits">0</strong></article><article class="card stat"><span>結果筆數</span><strong id="crossCount">0</strong></article></div><div class="table-wrap"><table><thead id="crossPlatformHead"></thead><tbody id="crossPlatformBody"></tbody></table></div></section></section>
@@ -283,7 +281,7 @@
   <dialog id="storesDialog">
     <form method="dialog">
       <div class="dialog-head"><h2>店鋪管理</h2><button type="button" class="icon secondary" data-close="storesDialog">×</button></div>
-      <p class="muted">商品可直接選擇店鋪編號，並與此處店鋪資料連動。店鋪可選填樂天／日安目標利潤率；留空時使用參數設定中的系統預設。日本國內運費同樣可由店鋪設定帶入。</p>
+      <p class="muted">商品可直接選擇店鋪編號，並與此處店鋪資料連動。日本國內運費同樣可由店鋪設定帶入。</p>
       <div class="toolbar-row import-row store-tools">
         <input id="storeExcelFile" type="file" accept=".xlsx,.xls" />
         <button id="storeImportBtn" type="button">匯入店鋪總表</button>
@@ -291,7 +289,7 @@
         <span id="storeImportStatus" class="muted"></span>
       </div>
       <div class="toolbar-row store-tools"><input id="storeSearch" type="search" placeholder="搜尋店鋪編號、名稱或網址"><button id="addStoreBtn" type="button">＋ 新增店鋪</button><span id="storeCount" class="muted"></span></div>
-      <div class="table-wrap small"><table><thead><tr><th>店鋪編號</th><th>店鋪名</th><th>店鋪網址</th><th>運費(JPY)</th><th>樂天目標利潤率</th><th>日安目標利潤率</th><th>操作</th></tr></thead><tbody id="storeTableBody"></tbody></table></div>
+      <div class="table-wrap small"><table><thead><tr><th>店鋪編號</th><th>店鋪名</th><th>店鋪網址</th><th>運費(JPY)</th><th>操作</th></tr></thead><tbody id="storeTableBody"></tbody></table></div>
     </form>
   </dialog>
 
@@ -303,8 +301,6 @@
         <label>店鋪編號<input id="storeCode" name="code" required placeholder="例如 R60"></label>
         <label>店鋪名<input id="storeName" name="name"></label>
         <label>日本國內運費(JPY)<input id="storeShipping" name="shippingJPY" type="number" min="0" step="1" required></label>
-        <label>樂天目標利潤率(%)<input id="storeRakutenTarget" name="rakutenTargetProfitRate" type="number" min="0" max="80" step="0.1" placeholder="留空＝系統預設"></label>
-        <label>日安目標利潤率(%)<input id="storeRianyouTarget" name="rianyouTargetProfitRate" type="number" min="0" max="80" step="0.1" placeholder="留空＝系統預設"></label>
         <label class="full-span">店鋪網址<input id="storeUrl" name="url" type="url" placeholder="https://..."></label>
       </div>
       <div class="dialog-actions"><button type="button" class="secondary" data-close="storeEditDialog">取消</button><button type="submit">儲存店鋪</button></div>
@@ -323,6 +319,6 @@
   </dialog>
 
   <div id="toast" class="toast hidden"></div>
-  <script type="module" src="app.js?v=1.3.11"></script>
+  <script type="module" src="app.js?v=2.0"></script>
 </body>
 </html>
